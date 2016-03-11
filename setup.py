@@ -5,11 +5,10 @@ import glob
 
 # Fetch version from git tags.
 # if git is not available (PyPi package), use stored version.py.
-version_py = os.path.join(os.path.dirname(__file__), 'version.py')
+version_py = os.path.join(os.path.dirname(__file__), 'genologics', 'version.py')
 
-try:
-    version = subprocess.Popen(["git", "describe", "--abbrev=0"],stdout=subprocess.PIPE).communicate()[0].rstrip()
-except:
+version = subprocess.Popen(["git", "describe", "--abbrev=0"],stdout=subprocess.PIPE).communicate()[0].rstrip()
+if not version:
     execfile(version_py)
     version = __version__
 
