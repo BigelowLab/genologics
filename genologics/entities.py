@@ -117,6 +117,8 @@ class SampleHistory:
                             samp_art_map[one_art.id] = (one_art.parent_process, input_art.id)
 
         self.art_map=samp_art_map
+        
+        
     def alternate_history(self, out_art, in_art=None):
         """This is a try at another way to generate the history.
         This one iterates over Artifact.parent_process and Process.all_inputs()
@@ -237,6 +239,7 @@ class SampleHistory:
          self.history=history
          self.history_list=hist_list
  
+ 
     def _add_out_art_process_conection_list(self, input_art, out_artifact, history = {}):
         """This function populates the history dict with process info per artifact.
         Maps an artifact to all the processes where its used as input and adds this 
@@ -260,6 +263,7 @@ class SampleHistory:
             else:
                 history[input_art] = {process.id : step_info}
         return history, input_art
+
 
 class BaseDescriptor(object):
     "Abstract base descriptor for an instance attribute."
@@ -664,6 +668,8 @@ class NestedEntityListDescriptor(EntityListDescriptor):
         for node in rootnode.findall(self.tag):
             result.append(self.klass(instance.lims, uri=node.attrib['uri']))
         return result
+        
+        
 class DimensionDescriptor(TagDescriptor):
     """An instance attribute containing a dictionary specifying
     the properties of a dimension of a container type.
@@ -790,6 +796,11 @@ class Entity(object):
         "Save this instance by doing PUT of its serialized XML."
         data = self.lims.tostring(ElementTree.ElementTree(self.root))
         self.lims.put(self.uri, data)
+    
+    def info(self):
+        "print uri and id for entity"
+        print("uri: %s" % self.uri)
+        print("limsid: %s" % self.id)
 
 
 class Lab(Entity):
