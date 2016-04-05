@@ -7,7 +7,11 @@ Copyright (C) 2012 Per Kraulis
 """
 
 import re
-import urlparse
+try:
+    from urllib.parse import urlsplit, urlparse, parse_qs, urlunparse
+except ImportError:
+    from urlparse import urlsplit, urlparse, parse_qs, urlunparse
+
 import datetime
 import time
 from xml.etree import ElementTree
@@ -44,7 +48,7 @@ _NSMAP = dict(
     ver='http://genologics.com/ri/version',
     wkfcnf='http://genologics.com/ri/workflowconfiguration')
 
-for prefix, uri in _NSMAP.iteritems():
+for prefix, uri in _NSMAP.items():
     ElementTree._namespace_map[uri] = prefix
 
 _NSPATTERN = re.compile(r'(\{)(.+?)(\})')
@@ -90,11 +94,11 @@ class SampleHistory:
         #    logger.info(value[1]+"->"+value[0].id+"->"+key)
         logger.info ("\nHistory :\n\n")
         logger.info("Input\tProcess\tProcess info")
-        for key, dict in self.history.iteritems():
+        for key, dict in self.history.items():
             logger.info (key)
-            for key2, dict2 in dict.iteritems():
+            for key2, dict2 in dict.items():
                 logger.info ("\t{}".format(key2))
-                for key, value in dict2.iteritems():
+                for key, value in dict2.items():
                     logger.info ("\t\t{0}->{1}".format(key,(value if value is not None else "None")))
         logger.info ("\nHistory List")
         for art in self.history_list:
@@ -231,7 +235,7 @@ class SampleHistory:
              history, out_artifact = self._add_out_art_process_conection_list(input_art, 
                                                          out_artifact, history)
              hist_list.append(input_art)
-         while self.art_map.has_key(out_artifact):
+         while out_artifact in self.art_map:
              pro, input_art = self.art_map[out_artifact]
              hist_list.append(input_art)
              history, out_artifact = self._add_out_art_process_conection_list(input_art, 
@@ -249,7 +253,7 @@ class SampleHistory:
         part of the historychain get the outart set to None. This is very important."""
         # Use the local process map if we have one, else, query the lims 
         for process in self.processes_per_artifact[input_art] if self.processes_per_artifact else lims.get_processes(inputartifactlimsid = inart):
-            #outputs = map(lambda a: (a.id), process.all_outputs())
+            # outputs = map(lambda a: (a.id), process.all_outputs())
             outputs = [a.id for a in process.all_outputs()] 
             outart = out_artifact if out_artifact in outputs else None 
             step_info = {'date' : process.date_run,
@@ -258,7 +262,7 @@ class SampleHistory:
                          'inart' : input_art,
                          'type' : process.type.id,
                          'name' : process.type.name}
-            if history.has_key(input_art):
+            if input_art in history:
                 history[input_art][process.id] = step_info
             else:
                 history[input_art] = {process.id : step_info}
@@ -391,7 +395,7 @@ class UdfDictionary(object):
             return self._udt
 
     def set_udt(self, name):
-        assert isinstance(name, basestring)
+        assert isinstance(name, str)
         if not self._udt:
             raise AttributeError('cannot set name for a UDF dictionary')
         self._udt = name
@@ -451,13 +455,13 @@ class UdfDictionary(object):
             if value is None:
                 pass
             elif vtype == 'string':
-                if not isinstance(value, basestring):
+                if not isinstance(value, str):
                     raise TypeError('String UDF requires str or unicode value')
             elif vtype == 'str':
-                if not isinstance(value, basestring):
+                if not isinstance(value, str):
                     raise TypeError('String UDF requires str or unicode value')
             elif vtype == 'text':
-                if not isinstance(value, basestring):
+                if not isinstance(value, str):
                     raise TypeError('Text UDF requires str or unicode value')
             elif vtype == 'numeric':
                 if not isinstance(value, (int, float)):
@@ -472,17 +476,17 @@ class UdfDictionary(object):
                     raise TypeError('Date UDF requires datetime.date value')
                 value = str(value)
             elif vtype == 'uri':
-                if not isinstance(value, basestring):
+                if not isinstance(value, str):
                     raise TypeError('URI UDF requires str or punycode (unicode) value')
                 value = str(value)
             else:
                 raise NotImplemented("UDF type '%s'" % vtype)
-            if not isinstance(value, unicode):
-                value = unicode(value, 'UTF-8')
+            if not isinstance(value, str):
+                value = str(value).encode('UTF-8')
             node.text = value
             break
         else:                           # Create new entry; heuristics for type
-            if isinstance(value, basestring):
+            if isinstance(value, str):
                 vtype = '\n' in value and 'Text' or 'String'
             elif isinstance(value, bool):
                 vtype = 'Boolean'
@@ -503,8 +507,8 @@ class UdfDictionary(object):
                                           nsmap('udf:field'),
                                           type=vtype,
                                           name=key)
-            if not isinstance(value, unicode):
-                value = unicode(str(value), 'UTF-8')
+            if not isinstance(value, str):
+                value =str(value).encode('UTF-8')
             elem.text = value
 
     def __delitem__(self, key):
@@ -515,7 +519,7 @@ class UdfDictionary(object):
                 break
 
     def items(self):
-        return self._lookup.items()
+        return list(self._lookup.items())
 
     def clear(self):
         for elem in self._elems:
@@ -525,9 +529,9 @@ class UdfDictionary(object):
     def __iter__(self):
         return self
 
-    def next(self):
+    def __next__(self):
         try:
-            ret=self._lookup.keys()[self.location]
+            ret=list(self._lookup.keys())[self.location]
         except IndexError:
             raise StopIteration()
         self.location = self.location + 1
@@ -546,9 +550,9 @@ class UdfDictionaryDescriptor(BaseDescriptor):
     _UDT = False
 
     def __get__(self, instance, cls):
-    	instance.get()
-   	self.value = UdfDictionary(instance, udt=self._UDT)
-   	return self.value
+        instance.get()
+        self.value = UdfDictionary(instance, udt=self._UDT)
+        return self.value
 
 class UdtDictionaryDescriptor(UdfDictionaryDescriptor):
     """An instance attribute containing a dictionary of UDF values
@@ -564,12 +568,12 @@ class PlacementDictionaryDescriptor(TagDescriptor):
     """
 
     def __get__(self, instance, cls):
-    	instance.get()
-      	self.value = dict()
-      	for node in instance.root.findall(self.tag):
+        instance.get()
+        self.value = dict()
+        for node in instance.root.findall(self.tag):
             key = node.find('value').text
             self.value[key] = Artifact(instance.lims,uri=node.attrib['uri'])
-       	return self.value
+        return self.value
 
 
 class ExternalidListDescriptor(BaseDescriptor):
@@ -697,14 +701,14 @@ class LocationDescriptor(TagDescriptor):
 class ReagentLabelList(BaseDescriptor):
     """An instance attribute yielding a list of reagent labels"""
     def __get__(self, instance, cls):
-	instance.get()
-	self.value = []
-	for node in instance.root.findall('reagent-label'):
-	    try:
-	    	self.value.append(node.attrib['name']) 
-	    except:
-		pass
-	return self.value
+        instance.get()
+        self.value = []
+        for node in instance.root.findall('reagent-label'):
+            try:
+                self.value.append(node.attrib['name'])
+            except:
+                pass
+        return self.value
 
 class InputOutputMapList(BaseDescriptor):
     """An instance attribute yielding a list of tuples (input, output)
@@ -784,7 +788,7 @@ class Entity(object):
     @property
     def id(self):
         "Return the LIMS id; obtained from the URI."
-        parts = urlparse.urlsplit(self.uri)
+        parts = urlsplit(self.uri)
         return parts.path.split('/')[-1]
 
     def get(self, force=False):
@@ -836,7 +840,7 @@ class Researcher(Entity):
 
     @property
     def name(self):
-        return u"%s %s" % (self.first_name, self.last_name)
+        return "%s %s" % (self.first_name, self.last_name)
 
 class Reagent_label(Entity):
     """Reagent label element"""
@@ -923,7 +927,7 @@ class Container(Entity):
         """Get the dictionary of locations and artifacts
         using the more efficient batch call."""
         result = self.placements.copy()
-        self.lims.get_batch(result.values())
+        self.lims.get_batch(list(result.values()))
         return result
 
 
@@ -963,14 +967,14 @@ class Process(Entity):
     def outputs_per_input(self, inart, ResultFile = False, SharedResultFile = False,  Analyte = False):
         """Getting all the output artifacts related to a particual input artifact"""
         
-        inouts = filter(lambda io: io[0]['limsid'] == inart, self.input_output_maps)
+        inouts = [io for io in self.input_output_maps if io[0]['limsid'] == inart]
         if ResultFile:
-            inouts = filter(lambda io: io[1]['output-type'] == 'ResultFile', inouts)
+            inouts = [io for io in inouts if io[1]['output-type'] == 'ResultFile']
         elif SharedResultFile:
-            inouts = filter(lambda io: io[1]['output-type'] == 'SharedResultFile', inouts)
+            inouts = [io for io in inouts if io[1]['output-type'] == 'SharedResultFile']
         elif Analyte:
-            inouts = filter(lambda io: io[1]['output-type'] == 'Analyte', inouts)
-        outs = map(lambda io: io[1]['uri'], inouts)
+            inouts = [io for io in inouts if io[1]['output-type'] == 'Analyte']
+        outs = [io[1]['uri'] for io in inouts]
         return outs
 
     def input_per_sample(self, sample):
@@ -1016,12 +1020,12 @@ class Process(Entity):
     def shared_result_files(self):
         """Retreve all resultfiles of output-generation-type PerAllInputs."""
         artifacts = self.all_outputs(unique=True)
-        return filter(lambda a: a.output_type == 'SharedResultFile', artifacts)
+        return [a for a in artifacts if a.output_type == 'SharedResultFile']
 
     def result_files(self):
         """Retreve all resultfiles of output-generation-type perInput."""
         artifacts = self.all_outputs(unique=True)
-        return filter(lambda a: a.output_type == 'ResultFile', artifacts)
+        return [a for a in artifacts if a.output_type == 'ResultFile']
 
     def analytes(self):
         """Retreving the output Analytes of the process, if existing. 
@@ -1030,16 +1034,16 @@ class Process(Entity):
         Makes aggregate processes and normal processes look the same."""
         info = 'Output'
         artifacts = self.all_outputs(unique=True)
-        analytes = filter(lambda a: a.type == 'Analyte', artifacts)
+        analytes = [a for a in artifacts if a.type == 'Analyte']
         if len(analytes) == 0:
             artifacts = self.all_inputs(unique=True)
-            analytes = filter(lambda a: a.type == 'Analyte', artifacts)
+            analytes = [a for a in artifacts if a.type == 'Analyte']
             info = 'Input'
         return analytes, info
 
     def parent_processes(self):
         """Retrieving all parent processes through the input artifacts"""
-        return map(lambda i_a: i_a.parent_process, self.all_inputs(unique=True))
+        return [i_a.parent_process for i_a in self.all_inputs(unique=True)]
 
     def output_containers(self):
         """Retrieve all unique output containers"""
@@ -1083,8 +1087,8 @@ class Artifact(Entity):
 
     def get_state(self):
         "Parse out the state value from the URI."
-        parts = urlparse.urlparse(self.uri)
-        params = urlparse.parse_qs(parts.query)
+        parts = urlparse(self.uri)
+        params = parse_qs(parts.query)
         try:
             return params['state'][0]
         except (KeyError, IndexError):
@@ -1100,9 +1104,9 @@ class Artifact(Entity):
 
     def stateless(self):
         "returns the artefact independently of it's state"
-        parts = urlparse.urlparse(self.uri)
+        parts = urlparse(self.uri)
         if 'state' in parts[4]:
-            stateless_uri=urlparse.urlunparse([parts[0],parts[1], parts[2], parts[3], '',''])
+            stateless_uri=urlunparse([parts[0],parts[1], parts[2], parts[3], '',''])
             return Artifact(self.lims, uri=stateless_uri)
         else:
             return self
@@ -1147,10 +1151,10 @@ class Step(Entity):
         actionsuri="{0}/actions".format(self.uri)
         self.actions= StepActions(lims,uri=actionsuri)
 
-
     #placements         = EntityDescriptor('placements', StepPlacements)
     #program_status     = EntityDescriptor('program-status',StepProgramStatus)
     #details            = EntityListDescriptor(nsmap('file:file'), StepDetails)
+
 
 class ProtocolStep(Entity):
     """Steps key in the Protocol object"""

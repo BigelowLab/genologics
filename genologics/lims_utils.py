@@ -8,6 +8,7 @@ import os
 
 from genologics.lims import *
 from genologics.config import BASEURI, USERNAME, PASSWORD
+
 lims = Lims(BASEURI, USERNAME, PASSWORD)
 
 def get_run_info(fc):
@@ -15,8 +16,8 @@ def get_run_info(fc):
 	for iom in fc.input_output_maps:
 		art = iom[0]['uri']
 		lane = art.location[1].split(':')[0]
-		if not fc_summary.has_key(lane):
-     			fc_summary[lane]= dict(art.udf.items()) #"%.2f" % val ----round??
+		if lane not in fc_summary:
+     			fc_summary[lane]= dict(list(art.udf.items())) #"%.2f" % val ----round??
 	return fc_summary
 
 def procHistory(proc, samplename):
@@ -53,8 +54,8 @@ def get_sequencing_info(fc):
     for iom in fc.input_output_maps:
         art = Artifact(lims,id = iom[0]['limsid'])
         lane = art.location[1].split(':')[0]
-        if not fc_summary.has_key(lane):
-            fc_summary[lane]= dict(art.udf.items()) #"%.2f" % val ----round??
+        if lane not in fc_summary:
+            fc_summary[lane]= dict(list(art.udf.items())) #"%.2f" % val ----round??
             fc_summary[lane]['qc'] = art.qc_flag
     return fc_summary
 

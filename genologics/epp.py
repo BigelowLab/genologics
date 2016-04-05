@@ -1,3 +1,4 @@
+from __future__ import print_function
 """Contains useful and reusable code for EPP scripts.
 
 Classes, methods and exceptions.
@@ -170,13 +171,13 @@ class EppLogger(object):
                     with open(local_log_path,'a') as f:
                         f.write('='*80+'\n')
             except HTTPError: # Probably no artifact found, skip prepending
-                print >> sys.stderr, ('No log file artifact found '
-                                      'for id: {0}').format(log_file_name)
+                print(('No log file artifact found '
+                                      'for id: {0}').format(log_file_name), file=sys.stderr)
             except IOError as e: # Probably some path was wrong in copy
-                print >> sys.stderr, ('Log could not be prepended, '
+                print(('Log could not be prepended, '
                                       'make sure {0} and {1} are '
                                       'proper paths.').format(log_path, 
-                                                              log_file_name)
+                                                              log_file_name), file=sys.stderr)
                 raise e
 
     class StreamToLogger(object):
@@ -221,7 +222,7 @@ class ReadResultFiles():
         """Reads a csv or txt into a list of lists, where sub lists are lines 
         of the csv."""
         outs = self.process.all_outputs()
-        outarts = filter(lambda a: a.output_type == output_type, outs)
+        outarts = [a for a in outs if a.output_type == output_type]
         parsed_files = {}
         for outart in outarts:
             file_path = self.get_file_path(outart)
@@ -273,7 +274,7 @@ class ReadResultFiles():
                 root_key = line[root_key_col]
                 cond1 = find_keys == [] and root_key not in exeptions
                 cond2 = root_key in find_keys
-                if file_info.has_key(root_key):
+                if root_key in file_info:
                     duplicated_lines.append(root_key)
                 elif (cond1 or cond2): 
                     file_info[root_key] = {}
@@ -296,7 +297,7 @@ class ReadResultFiles():
         if not file_info:
             error_message = error_message + "Could not format parsed file {0}.".format(name)
         if error_message:
-            print >> sys.stderr, error_message
+            print(error_message, file=sys.stderr)
             sys.exit(-1)    
         return file_info
 
@@ -347,7 +348,7 @@ class CopyField(object):
             elt.put()
             return True
         except (TypeError, HTTPError) as e:
-            print >> sys.stderr, "Error while updating element: {0}".format(e)
+            print("Error while updating element: {0}".format(e), file=sys.stderr)
             sys.exit(-1)
             return False
 

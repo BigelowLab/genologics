@@ -1,4 +1,5 @@
 from setuptools import setup, find_packages
+from genologics.version import __version__
 import sys, os
 import subprocess
 import glob
@@ -7,10 +8,10 @@ import glob
 # if git is not available (PyPi package), use stored version.py.
 version_py = os.path.join(os.path.dirname(__file__), 'genologics', 'version.py')
 
-version = subprocess.Popen(["git", "describe", "--abbrev=0"],stdout=subprocess.PIPE).communicate()[0].rstrip()
+version = subprocess.Popen(["git", "describe", "--abbrev=0"],stdout=subprocess.PIPE, universal_newlines=True).communicate()[0].rstrip()
 if not version:
-    execfile(version_py)
     version = __version__
+    
 
 
 setup(name='genologics',

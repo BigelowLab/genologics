@@ -5,13 +5,24 @@ LIMS interface.
 Per Kraulis, Science for Life Laboratory, Stockholm, Sweden.
 Copyright (C) 2012 Per Kraulis
 """
+import os
+from io import BytesIO
 
 __all__ = ['Lab', 'Researcher', 'Project', 'Sample',
            'Containertype', 'Container', 'Processtype', 'Process',
            'Artifact', 'Lims']
 
-import urllib
-from cStringIO import StringIO
+#python 2.7, 3+ compatibility
+from sys import version_info
+if version_info.major == 2:
+    from urlparse import urljoin
+    from urllib import urlencode
+else:
+    from urllib.parse import urljoin
+    from urllib.parse import urlencode
+
+
+
 
 # http://docs.python-requests.org/
 import requests
@@ -47,9 +58,9 @@ class Lims(object):
     def get_uri(self, *segments, **query):
         "Return the full URI given the path segments and optional query."
         segments = ['api', self.VERSION] + list(segments)
-        url = urlparse.urljoin(self.baseuri, '/'.join(segments))
+        url = urljoin(self.baseuri, '/'.join(segments))
         if query:
-            url += '?' + urllib.urlencode(query)
+            url += '?' + urlencode(query)
         return url
 
     def get(self, uri, params=dict()):
@@ -73,10 +84,42 @@ class Lims(object):
             segments = [uri, 'download']
         else:
             raise ValueError("id or uri required")
-        url = urlparse.urljoin(self.baseuri, '/'.join(segments))
+        url = urljoin(self.baseuri, '/'.join(segments))
         r=self.request_session.get(url, auth=(self.username, self.password), timeout=TIMEOUT)
-        #TODO add a returncode check here 
+        self.validate_response(r)
         return r.text
+
+    def upload_new_file(self, entity, file_to_upload):
+        """Upload a file and attach it to the provided entity."""
+        file_to_upload = os.path.abspath(file_to_upload)
+        if not os.path.isfile(file_to_upload):
+            raise IOError("{} not found".format(file_to_upload))
+
+        #Request the storage space on glsstorage
+        # Create the xml to describe the file
+        root = ElementTree.Element(nsmap('file:file'))
+        s = ElementTree.SubElement(root, 'attached-to')
+        s.text = entity.uri
+        s = ElementTree.SubElement(root, 'original-location')
+        s.text = file_to_upload
+        root = self.post(
+                uri=self.get_uri('glsstorage'),
+                data=self.tostring(ElementTree.ElementTree(root))
+        )
+
+        #Create the file object
+        root = self.post(
+                uri=self.get_uri('files'),
+                data=self.tostring(ElementTree.ElementTree(root))
+        )
+        file = File(self, uri=root.attrib['uri'])
+
+        #Actually upload the file
+        uri = self.get_uri('files', file.id, 'upload')
+        r = requests.post(uri, files= {'file':(file_to_upload, open(file_to_upload, 'rb'))},
+                          auth=(self.username, self.password))
+        self.validate_response(r)
+        return file
 
 
     def put(self, uri, data, params=dict()):
@@ -103,7 +146,7 @@ class Lims(object):
         """Raise ValueError if the version for this interface
         does not match any of the versions given for the API.
         """
-        uri = urlparse.urljoin(self.baseuri, 'api')
+        uri = urljoin(self.baseuri, 'api')
         r = requests.get(uri, auth=(self.username, self.password))
         root = self.parse_response(r)
         tag = nsmap('ver:versions')
@@ -112,9 +155,9 @@ class Lims(object):
             if node.attrib['major'] == self.VERSION: return
         raise ValueError('version mismatch')
 
-    def parse_response(self, response, accept_status_codes = [200]):
+    def validate_response(self, response, accept_status_codes = [200]):
         """Parse the XML returned in the response.
-        Raise an HTTP error if the response status is not one of the 
+        Raise an HTTP error if the response status is not one of the
         specified accepted status codes.
         """
         if response.status_code not in accept_status_codes:
@@ -128,10 +171,16 @@ class Lims(object):
                 if node is not None:
                     message += ' ' + node.text
             except ElementTree.ParseError: # some error messages might not follow the xml standard
-                message=response.content 
+                message=response.content
             raise requests.exceptions.HTTPError(message)
-        else:
-            root = ElementTree.fromstring(response.content)
+        return True
+
+    def parse_response(self, response, accept_status_codes = [200]):
+        """Parse the XML returned in the response.
+        Raise an HTTP error if the response status is not 200.
+        """
+        self.validate_response(response, accept_status_codes)
+        root = ElementTree.fromstring(response.content)
         return root
 
     def get_udfs(self, name = None, attach_to_name = None, attach_to_category = None, start_index = None):
@@ -350,7 +399,7 @@ class Lims(object):
     def _get_params(self, **kwargs):
         "Convert keyword arguments to a kwargs dictionary."
         result = dict()
-        for key, value in kwargs.iteritems():
+        for key, value in kwargs.items():
             if value is None: continue
             result[key.replace('_', '-')] = value
         return result
@@ -358,11 +407,11 @@ class Lims(object):
     def _get_params_udf(self, udf=dict(), udtname=None, udt=dict()):
         "Convert UDF-ish arguments to a params dictionary."
         result = dict()
-        for key, value in udf.iteritems():
+        for key, value in udf.items():
             result["udf.%s" % key] = value
         if udtname is not None:
             result['udt.name'] = udtname
-        for key, value in udt.iteritems():
+        for key, value in udt.items():
             result["udt.%s" % key] = value
         return result
 
@@ -382,16 +431,16 @@ class Lims(object):
 
     def get_batch(self, instances, force=False):
         """Get the content of a set of instances using the efficient batch call.
-        
+
         Returns the list of requested instances in arbitrary order, with duplicates removed
         (duplicates=entities occurring more than once in the instances argument).
 
-        For Artifacts it is possible to have multiple instances with the same LIMSID but 
-        different URI, differing by a query parameter ?state=XX. If state is not 
+        For Artifacts it is possible to have multiple instances with the same LIMSID but
+        different URI, differing by a query parameter ?state=XX. If state is not
         given for an input URI, a state is added in the data returned by the batch
         API. In this case, the URI of the Entity object is not updated by this function
         (this is similar to how Entity.get() works). This may help with caching.
-        
+
         The batch request API call collapses all requested Artifacts with different
         state into a single result with state equal to the state of the Artifact
         occurring at the last position in the list.
@@ -439,12 +488,38 @@ class Lims(object):
         data = self.tostring(ElementTree.ElementTree(root))
         root = self.post(uri, data)
 
+    def route_artifacts(self, artifact_list, workflow_uri=None, stage_uri=None, unassign=False):
+
+        root = ElementTree.Element(nsmap('rt:routing'))
+
+        if unassign:
+            s = ElementTree.SubElement(root, 'unassign')
+        else:
+            s = ElementTree.SubElement(root, 'assign')
+        if workflow_uri:
+            s.set('workflow-uri', workflow_uri)
+        if stage_uri:
+            s.set('stage-uri', stage_uri)
+        for artifact in artifact_list:
+            a = ElementTree.SubElement(s, 'artifact')
+            a.set('uri', artifact.uri)
+
+        uri = self.get_uri('route', 'artifacts')
+        r = requests.post(uri, data=self.tostring(ElementTree.ElementTree(root)),
+                          auth=(self.username, self.password),
+                          headers={'content-type': 'application/xml',
+                                   'accept': 'application/xml'})
+
+        self.validate_response(r)
+
+
+
     def tostring(self, etree):
         "Return the ElementTree contents as a UTF-8 encoded XML string."
-        outfile = StringIO()
+        outfile = BytesIO()
         self.write(outfile, etree)
         return outfile.getvalue()
 
     def write(self, outfile, etree):
         "Write the ElementTree contents as UTF-8 encoded XML to the open file."
-        etree.write(outfile, encoding='UTF-8')
+        etree.write(outfile, encoding='utf-8', xml_declaration=True)
