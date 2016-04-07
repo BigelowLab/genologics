@@ -11,6 +11,9 @@ from genologics.entities import *
 from genologics.lims import *
 
 
+def check_node_args(arg):
+	if not arg:
+		raise IOError("{arg} needed to create node")
 
 def create_container_node(lims, type_uri = None, name = None):
     '''
@@ -47,8 +50,51 @@ def post_container_node(lims, xml_node):
     '''
     uri = lims.get_uri("containers")
     response = lims.post(uri, xml_node)
-    print(Container(lims, response.attrib['uri']).info()
-    return(response)
+    print(Container(lims, response.attrib['uri']).info())
+    return Container(lims, response.attrib['uri'])
+
+def create_sample_node(name=None, project_uri=None, container_uri = None, 
+                       well=None, date_received=None, date_completed=None):
+    '''
+    create sample xml node as a string
+
+    '''
+    check_node_args("name", name)
+    check_node_args("project_uri", project_uri)
+    check_node_args("container_uri", container_uri)
+    check_node_args("well", well)
+    
+    if len(well.split(":")) != 2:
+    	raise IOError('error creating node: well value must be in the format "row : column"')
+
+    nmsp = 'smp:samplecreation'
+    top = Element(nsmap(nmsp))
+    
+    sname = SubElement(top, "name")
+    sname.text = name
+    
+    project = SubElement(top, 'project uri="%s"' % project_uri)
+    
+    location = SubElement(top, "location")
+    container = SubElement(location, 'container uri="%s"' % container_uri)
+    value = SubElement(location, "value")
+    value.text = well
+    
+    if date_received:
+        datein = SubElement(top, "date-received")
+        datein.text = date_received
+    if date_completed:
+        dateout = SubElement(top, "date-completed")
+        dateout.text = date_completed
+        
+    print(tostring(top))
+    return tostring(top)
+    
+def post_sample_node(lims, xml_node):
+    uri = lims.get_uri("samples")
+    response = lims.post(uri, xml_node)
+    print(Sample(lims, response.attrib['uri']).info())
+    return Sample(lims, response.attrib['uri'])
 
 
 
