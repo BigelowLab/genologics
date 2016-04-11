@@ -275,7 +275,6 @@ class BaseDescriptor(object):
     def __get__(self, instance, cls):
         raise NotImplementedError
 
-
 class TagDescriptor(BaseDescriptor):
     """Abstract base descriptor for an instance attribute
     represented by an XML element.
@@ -283,7 +282,6 @@ class TagDescriptor(BaseDescriptor):
 
     def __init__(self, tag):
         self.tag = tag
-
 
 class StringDescriptor(TagDescriptor):
     """An instance attribute containing a string value
@@ -311,7 +309,6 @@ class StringDescriptor(TagDescriptor):
         else:
             return instance.root
 
-
 class StringAttributeDescriptor(TagDescriptor):
     """An instance attribute containing a string value
     represented by an XML attribute.
@@ -320,7 +317,6 @@ class StringAttributeDescriptor(TagDescriptor):
     def __get__(self, instance, cls):
         instance.get()
         return instance.root.attrib[self.tag]
-
 
 class StringListDescriptor(TagDescriptor):
     """An instance attribute containing a list of strings
@@ -333,7 +329,6 @@ class StringListDescriptor(TagDescriptor):
         for node in instance.root.findall(self.tag):
             result.append(node.text)
         return result
-
 
 class StringDictionaryDescriptor(TagDescriptor):
     """An instance attribute containing a dictionary of string key/values
@@ -349,7 +344,6 @@ class StringDictionaryDescriptor(TagDescriptor):
                 result[node2.tag] = node2.text
         return result
 
-
 class IntegerDescriptor(StringDescriptor):
     """An instance attribute containing an integer value
     represented by an XMl element.
@@ -362,7 +356,6 @@ class IntegerDescriptor(StringDescriptor):
             return None
         else:
             return int(node.text)
-
 
 class BooleanDescriptor(StringDescriptor):
     """An instance attribute containing a boolean value
@@ -377,9 +370,14 @@ class BooleanDescriptor(StringDescriptor):
         else:
             return node.text.lower() == 'true'
 
-
 class UdfDictionary(object):
     "Dictionary-like container of UDFs, optionally within a UDT."
+
+    def _is_string(self, value):
+        try:
+            return isinstance(value, basestring)
+        except:
+            return isinstance(value, str)
 
     def __init__(self, instance, udt=False):
         self.instance = instance
@@ -455,13 +453,13 @@ class UdfDictionary(object):
             if value is None:
                 pass
             elif vtype == 'string':
-                if not isinstance(value, str):
+                if not self._is_string(value):
                     raise TypeError('String UDF requires str or unicode value')
             elif vtype == 'str':
-                if not isinstance(value, str):
+                if not self._is_string(value):
                     raise TypeError('String UDF requires str or unicode value')
             elif vtype == 'text':
-                if not isinstance(value, str):
+                if not self._is_string(value):
                     raise TypeError('Text UDF requires str or unicode value')
             elif vtype == 'numeric':
                 if not isinstance(value, (int, float)):
@@ -486,7 +484,7 @@ class UdfDictionary(object):
             node.text = value
             break
         else:                           # Create new entry; heuristics for type
-            if isinstance(value, str):
+            if self._is_string(value):
                 vtype = '\n' in value and 'Text' or 'String'
             elif isinstance(value, bool):
                 vtype = 'Boolean'
@@ -540,8 +538,6 @@ class UdfDictionary(object):
     def get(self, key, default=None):
         return self._lookup.get(key, default)
 
-
-
 class UdfDictionaryDescriptor(BaseDescriptor):
     """An instance attribute containing a dictionary of UDF values
     represented by multiple XML elements.
@@ -561,7 +557,6 @@ class UdtDictionaryDescriptor(UdfDictionaryDescriptor):
 
     _UDT = True
 
-
 class PlacementDictionaryDescriptor(TagDescriptor):
     """An instance attribute containing a dictionary of locations
     keys and artifact values represented by multiple XML elements.
@@ -575,7 +570,6 @@ class PlacementDictionaryDescriptor(TagDescriptor):
             self.value[key] = Artifact(instance.lims,uri=node.attrib['uri'])
         return self.value
 
-
 class ExternalidListDescriptor(BaseDescriptor):
     """An instance attribute yielding a list of tuples (id, uri) for
     external identifiers represented by multiple XML elements.
@@ -587,7 +581,6 @@ class ExternalidListDescriptor(BaseDescriptor):
         for node in instance.root.findall(nsmap('ri:externalid')):
             result.append((node.attrib.get('id'), node.attrib.get('uri')))
         return result
-
 
 class EntityDescriptor(TagDescriptor):
     "An instance attribute referencing another entity instance."
@@ -603,7 +596,6 @@ class EntityDescriptor(TagDescriptor):
             return None
         else:
             return self.klass(instance.lims, uri=node.attrib['uri'])
-
 
 class EntityListDescriptor(EntityDescriptor):
     """An instance attribute yielding a list of entity instances
@@ -672,8 +664,7 @@ class NestedEntityListDescriptor(EntityListDescriptor):
         for node in rootnode.findall(self.tag):
             result.append(self.klass(instance.lims, uri=node.attrib['uri']))
         return result
-        
-        
+
 class DimensionDescriptor(TagDescriptor):
     """An instance attribute containing a dictionary specifying
     the properties of a dimension of a container type.
@@ -685,7 +676,6 @@ class DimensionDescriptor(TagDescriptor):
         return dict(is_alpha = node.find('is-alpha').text.lower() == 'true',
                     offset = int(node.find('offset').text),
                     size = int(node.find('size').text))
-
 
 class LocationDescriptor(TagDescriptor):
     """An instance attribute containing a tuple (container, value)
@@ -756,7 +746,6 @@ class Entity(object):
                 raise ValueError("Entity uri and id can't be both None")
             else:
                 uri = lims.get_uri(cls._URI, id)
-
         try:
             return lims.cache[uri]
         except KeyError:
@@ -961,6 +950,7 @@ class Process(Entity):
     udf            = UdfDictionaryDescriptor()
     udt            = UdtDictionaryDescriptor()
     files          = EntityListDescriptor(nsmap('file:file'), File)
+
     # instrument XXX
     # process_parameters XXX
 
@@ -1053,6 +1043,11 @@ class Process(Entity):
                 cs.append(o_a.container)
         return list(frozenset(cs))
 
+    @property
+    def step(self):
+        """Retrive the Step coresponding to this process. They share the same id"""
+        return Step(self.lims, id=self.id)
+
 class Artifact(Entity):
     "Any process input or output; analyte or file."
 
@@ -1116,28 +1111,76 @@ class Artifact(Entity):
     stateless = property(stateless) 
 
 class StepActions(Entity):
-    """Small hack to be able to query the actions subentity of
-    the Step entity. Right now, only the escalation is parsed."""
+    """Actions associated with a step"""
+    _escalation = None
 
-    def __init__(self, lims, uri=None, id=None):
-        super(StepActions, self).__init__(lims,uri,id)
-        self.escalation={}
-        self.lims=lims
-        self.root=self.lims.get(self.uri)
-        for node in self.root.findall('escalation'):
-            self.escalation['artifacts']=[]
-            self.escalation['author']=Researcher(lims,uri=node.find('request').find('author').attrib.get('uri'))
-            self.escalation['request']=uri=node.find('request').find('comment').text
-            if node.find('review') is not None: #recommended by the Etree doc
-                self.escalation['status']='Reviewed'
-                self.escalation['reviewer']= Researcher(lims,uri=node.find('review').find('author').attrib.get('uri'))
-                self.escalation['answer']=uri=node.find('review').find('comment').text
-            else:
-                self.escalation['status']='Pending'
+    @property
+    def escalation(self):
+        if not self._escalation:
+            self.get()
+            self._escalation={}
+            for node in self.root.findall('escalation'):
+                self._escalation['artifacts']=[]
+                self._escalation['author']=Researcher(self.lims,uri=node.find('request').find('author').attrib.get('uri'))
+                self._escalation['request']=uri=node.find('request').find('comment').text
+                if node.find('review') is not None: #recommended by the Etree doc
+                    self._escalation['status']='Reviewed'
+                    self._escalation['reviewer']= Researcher(self.lims,uri=node.find('review').find('author').attrib.get('uri'))
+                    self._escalation['answer']=uri=node.find('review').find('comment').text
+                else:
+                    self._escalation['status']='Pending'
 
-            for node2 in node.findall('escalated-artifacts'):
-                art= lims.get_batch([Artifact(lims,uri=ch.attrib.get('uri')) for ch in node2])
-                self.escalation['artifacts'].extend(art)
+                for node2 in node.findall('escalated-artifacts'):
+                    art= self.lims.get_batch([Artifact(self.lims, uri=ch.attrib.get('uri')) for ch in node2])
+                    self._escalation['artifacts'].extend(art)
+        return self._escalation
+
+    @property
+    def next_actions(self):
+        actions = []
+        self.get()
+        if self.root.find('next-actions') is not None:
+            for node in self.root.find('next-actions').findall('next-action'):
+                action = {
+                    'artifact': Artifact(self.lims, node.attrib.get('artifact-uri')),
+                    'action': node.attrib.get('action'),
+                }
+                if node.attrib.get('step-uri'):
+                    action['step']=Step(self.lims, uri=node.attrib.get('step-uri'))
+                if node.attrib.get('rework-step-uri'):
+                    action['rework-step']=Step(self.lims, uri=node.attrib.get('rework-step-uri'))
+                actions.append(action)
+        return actions
+
+class ReagentKit(Entity):
+    """Type of Reagent with information about the provider"""
+    _URI="reagenttypes"
+    _TAG="reagent-kit"
+
+    name = StringDescriptor('name')
+    supplier = StringDescriptor('supplier')
+    website = StringDescriptor('website')
+    archived = BooleanDescriptor('archived')
+
+class ReagentLot(Entity):
+    """Reagent Lots contain information about a particualr lot of reagent used in a step"""
+    _URI="reagentlot"
+    _TAG="reagent-lot"
+
+    reagent_kit = EntityDescriptor('reagent-kit', ReagentKit)
+    name = StringDescriptor('name')
+    lot_number = StringDescriptor('lot-number')
+    created_date = StringDescriptor('created-date')
+    last_modified_date = StringDescriptor('last-modified-date')
+    expiry_date = StringDescriptor('expiry-date')
+    created_by = EntityDescriptor('created-by', Researcher)
+    last_modified_by = EntityDescriptor('last-modified-by', Researcher)
+    status = StringDescriptor('status')
+    usage_count = IntegerDescriptor('usage-count')
+
+
+class StepReagentLots(Entity):
+    reagent_lots = NestedEntityListDescriptor('reagent-lot', ReagentLot, 'reagent-lots')
 
 
 class Step(Entity):
@@ -1145,16 +1188,15 @@ class Step(Entity):
 
     _URI = 'steps'
 
-    def __init__(self, lims, uri=None, id=None):
-        super(Step, self).__init__(lims,uri,id)
-        assert self.uri is not None
-        actionsuri="{0}/actions".format(self.uri)
-        self.actions= StepActions(lims,uri=actionsuri)
-
+    _reagent_lots       = EntityDescriptor('reagent-lots', StepReagentLots)
+    actions             = EntityDescriptor('actions', StepActions)
     #placements         = EntityDescriptor('placements', StepPlacements)
     #program_status     = EntityDescriptor('program-status',StepProgramStatus)
     #details            = EntityListDescriptor(nsmap('file:file'), StepDetails)
 
+    @property
+    def reagent_lots(self):
+        return self._reagent_lots.reagent_lots
 
 class ProtocolStep(Entity):
     """Steps key in the Protocol object"""
@@ -1184,6 +1226,7 @@ class Stage(Entity):
     """Holds Protocol/Workflow"""
     protocol = EntityDescriptor('protocol', Protocol)
 
+
 class Workflow(Entity):
     """ Workflow, introduced in 3.5"""
     _URI="configuration/workflows"
@@ -1211,10 +1254,10 @@ class ReagentType(Entity):
                     if child.attrib.get("name") == "Sequence":
                         self.sequence=child.attrib.get("value")
 
+
 Sample.artifact          = EntityDescriptor('artifact', Artifact)
 StepActions.step         = EntityDescriptor('step', Step)
 Stage.workflow            = EntityDescriptor('workflow', Workflow)
 Artifact.workflow_stages = NestedEntityListDescriptor('workflow-stage', Stage, 'workflow-stages')
 Step.configuration      = EntityDescriptor('configuration', ProtocolStep)
-
 

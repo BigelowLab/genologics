@@ -3,16 +3,18 @@ from xml.etree import ElementTree
 from sys import version_info
 from io import BytesIO
 
+from genologics.lims import Lims
+from genologics.entities import StringDescriptor, StringAttributeDescriptor, StringListDescriptor, \
+    StringDictionaryDescriptor, IntegerDescriptor, BooleanDescriptor, UdfDictionary, StepActions, Researcher, Artifact, \
+    Step
+
 if version_info.major == 2:
     from mock import patch, Mock
-    import __builtin__ as builtins
 else:
     from unittest.mock import patch, Mock
-    import builtins
 
 
-from genologics.entities import StringDescriptor, StringAttributeDescriptor, StringListDescriptor, \
-    StringDictionaryDescriptor, IntegerDescriptor, BooleanDescriptor, UdfDictionary
+
 
 
 class TestEntities(TestCase):
@@ -196,6 +198,16 @@ class TestUdfDictionary(TestCase):
         self.dict1.__setitem__('how much', None)
         assert self._get_udf_value(self.dict1, 'how much') == b'None'
 
+    def test___setitem__unicode(self):
+        assert self._get_udf_value(self.dict1, 'test') == 'stuff'
+        self.dict1.__setitem__('test', u'unicode')
+        assert self._get_udf_value(self.dict1, 'test') == 'unicode'
+
+        self.dict1.__setitem__(u'test', 'unicode2')
+        assert self._get_udf_value(self.dict1, 'test') == 'unicode2'
+
+
+
     def test___delitem__(self):
         pass
 
@@ -213,4 +225,87 @@ class TestUdfDictionary(TestCase):
 
     def test_get(self):
         pass
+
+
+
+class TestEntities(TestCase):
+    url = 'http://testgenologics.com:4040'
+    dummy_xml="""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    <dummy></dummy>"""
+
+    def setUp(self):
+        self.lims = Lims(self.url, username='test', password='password')
+
+class TestStepActions(TestEntities):
+    url = 'http://testgenologics.com:4040'
+    step_actions_xml = """<stp:actions xmlns:stp="http://genologics.com/ri/step" uri="...">
+  <step rel="..." uri="{url}/steps/s1">
+  </step>
+  <configuration uri="{url}/config/1">...</configuration>
+  <next-actions>
+    <next-action artifact-uri="{url}/artifacts/a1" action="requeue" step-uri="..." rework-step-uri="...">
+    </next-action>
+  </next-actions>
+  <escalation>
+    <request>
+      <author uri="{url}/researchers/r1">
+        <first-name>foo</first-name>
+        <last-name>bar</last-name>
+      </author>
+      <reviewer uri="{url}/researchers/r1">
+        <first-name>foo</first-name>
+        <last-name>bar</last-name>
+      </reviewer>
+      <date>01-01-1970</date>
+      <comment>no comments</comment>
+    </request>
+    <review>
+      <author uri="{url}/researchers/r1">
+        <first-name>foo</first-name>
+        <last-name>bar</last-name>
+      </author>
+      <date>01-01-1970</date>
+      <comment>no comments</comment>
+    </review>
+    <escalated-artifacts>
+      <escalated-artifact uri="{url}/artifacts/r1">
+      </escalated-artifact>
+    </escalated-artifacts>
+  </escalation>
+</stp:actions>""".format(url=url)
+
+    step_actions_no_escalation_xml = """<stp:actions xmlns:stp="http://genologics.com/ri/step" uri="...">
+  <step rel="..." uri="{url}/steps/s1">
+  </step>
+  <configuration uri="{url}/config/1">...</configuration>
+  <next-actions>
+    <next-action artifact-uri="{url}/artifacts/a1" action="requeue" step-uri="{url}/steps/s1" rework-step-uri="{url}/steps/s2">
+    </next-action>
+  </next-actions>
+</stp:actions>""".format(url=url)
+
+    def test_escalation(self):
+        s = StepActions(uri=self.lims.get_uri('steps', 'step_id', 'actions'), lims=self.lims)
+        with patch('requests.Session.get',return_value=Mock(content = self.step_actions_xml, status_code=200)),\
+             patch('requests.post', return_value=Mock(content = self.dummy_xml, status_code=200)):
+            r = Researcher(uri='http://testgenologics.com:4040/researchers/r1', lims=self.lims)
+            a = Artifact(uri='http://testgenologics.com:4040/artifacts/r1', lims=self.lims)
+            expected_escalation = {
+                'status': 'Reviewed',
+                'author': r,
+                'artifacts': [a], 'request': 'no comments',
+                'answer': 'no comments',
+                'reviewer': r}
+
+            assert s.escalation == expected_escalation
+
+    def test_next_actions(self):
+        s = StepActions(uri=self.lims.get_uri('steps', 'step_id', 'actions'), lims=self.lims)
+        with patch('requests.Session.get',return_value=Mock(content = self.step_actions_no_escalation_xml, status_code=200)):
+            step1 = Step(self.lims, uri='http://testgenologics.com:4040/steps/s1')
+            step2 = Step(self.lims, uri='http://testgenologics.com:4040/steps/s2')
+            artifact = Artifact(self.lims, uri='http://testgenologics.com:4040/artifacts/a1')
+            expected_next_actions = [{'artifact': artifact, 'action': 'requeue',
+                                      'step': step1, 'rework-step': step2}]
+            assert s.next_actions == expected_next_actions
 

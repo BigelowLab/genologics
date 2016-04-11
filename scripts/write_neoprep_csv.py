@@ -30,6 +30,8 @@ def generate_data(step):
     proto_pattern=re.compile("([3,5]50)")
     #contents of the rows will be taken from both input and output artifacts
     data=""
+    required_lines=16
+    written_lines=0
     for inout in step.input_output_maps:
         inp=inout[0]['uri']
         out=inout[1]['uri']
@@ -69,8 +71,17 @@ def generate_data(step):
 
             if reglab_name == 'D':
                 data+="{0},{1},{2},{3},{4}\n".format(sname, well, reglab_name, reglab_seq, ins_size)
+                written_lines+=1
             else:
                 data+="{0},{1},{2},{3}\n".format(sname, well, reglab_name, reglab_seq)
+                written_lines+=1
+
+    if written_lines<required_lines:
+        if reglab_name == 'D':
+            data+="X,X,X,X,X\n"*(required_lines - written_lines)
+        else:
+            data+="X,X,X,X\n"*(required_lines - written_lines)
+
     header=generate_header(step, reglab_name[1])
     return header+data
         

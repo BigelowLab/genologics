@@ -11,7 +11,8 @@ version_py = os.path.join(os.path.dirname(__file__), 'genologics', 'version.py')
 version = subprocess.Popen(["git", "describe", "--abbrev=0"],stdout=subprocess.PIPE, universal_newlines=True).communicate()[0].rstrip()
 if not version:
     version = __version__
-    
+else:
+    version = version.decode("utf-8")
 
 
 setup(name='genologics',

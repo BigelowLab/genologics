@@ -489,9 +489,7 @@ class Lims(object):
         root = self.post(uri, data)
 
     def route_artifacts(self, artifact_list, workflow_uri=None, stage_uri=None, unassign=False):
-
         root = ElementTree.Element(nsmap('rt:routing'))
-
         if unassign:
             s = ElementTree.SubElement(root, 'unassign')
         else:
@@ -509,7 +507,6 @@ class Lims(object):
                           auth=(self.username, self.password),
                           headers={'content-type': 'application/xml',
                                    'accept': 'application/xml'})
-
         self.validate_response(r)
 
 
