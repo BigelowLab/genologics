@@ -14,6 +14,11 @@ if not version:
 else:
     version = version.decode("utf-8")
 
+try:
+    with open("requirements.txt") as rq:
+        requires=rq.readlines()
+except:
+    requires=["requests"]
 
 setup(name='genologics',
       version=version,
