@@ -110,8 +110,8 @@ def main(args, lims):
             iom[1]['uri'].udf['%CV']=float(di[poskey]['cv'])
             iom[1]['uri'].put()
 
-    if any(x["cv"] > CV_LIMIT for x in di.values()):
-        sys.stderr.write("One or several samples has a CV above {:d}. "
+    if any(float(x["cv"]) > CV_LIMIT for x in di.values()):
+        sys.stderr.write("One or several samples has a CV above {:d}%. "
             "Check the output file for details.".format(CV_LIMIT))
         sys.exit(2)
 

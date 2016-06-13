@@ -36,7 +36,7 @@ def check_udf_is_defined(artifacts, udf):
     filtered_artifacts = []
     incorrect_artifacts = []
     for artifact in artifacts:
-        if (udf in artifact.udf):
+        if (udf in artifact.udf) and artifact.udf[udf] != 0:
             filtered_artifacts.append(artifact)
         else:
             logging.warning(("Found artifact for sample {0} with {1} "
