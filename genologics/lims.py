@@ -5,15 +5,19 @@ LIMS interface.
 Per Kraulis, Science for Life Laboratory, Stockholm, Sweden.
 Copyright (C) 2012 Per Kraulis
 """
-import os
-from io import BytesIO
 
 __all__ = ['Lab', 'Researcher', 'Project', 'Sample',
            'Containertype', 'Container', 'Processtype', 'Process',
            'Artifact', 'Lims']
 
-#python 2.7, 3+ compatibility
+import os
+import re
+from io import BytesIO
+import requests
+
+# python 2.7, 3+ compatibility
 from sys import version_info
+
 if version_info.major == 2:
     from urlparse import urljoin
     from urllib import urlencode
@@ -22,21 +26,17 @@ else:
     from urllib.parse import urlencode
 
 
-
-
-# http://docs.python-requests.org/
-import requests
-
 from .entities import *
 
-TIMEOUT=16
+TIMEOUT = 16
+
 
 class Lims(object):
     "LIMS interface through which all entity instances are retrieved."
 
     VERSION = 'v2'
 
-    def __init__(self, baseuri, username, password, version = VERSION):
+    def __init__(self, baseuri, username, password, version=VERSION):
         """baseuri: Base URI for the GenoLogics server, excluding
                     the 'api' or version parts!
                     For example: https://genologics.scilifelab.se:8443/
@@ -51,7 +51,7 @@ class Lims(object):
         self.cache = dict()
         # For optimization purposes, enables requests to persist connections
         self.request_session = requests.Session()
-        #The connection pool has a default size of 10
+        # The connection pool has a default size of 10
         self.adapter = requests.adapters.HTTPAdapter(pool_connections=100, pool_maxsize=100)
         self.request_session.mount('http://', self.adapter)
 
@@ -67,9 +67,9 @@ class Lims(object):
         "GET data from the URI. Return the response XML as an ElementTree."
         try:
             r = self.request_session.get(uri, params=params,
-                         auth=(self.username, self.password),
-                         headers=dict(accept='application/xml'),
-                         timeout=TIMEOUT)
+                                         auth=(self.username, self.password),
+                                         headers=dict(accept='application/xml'),
+                                         timeout=TIMEOUT)
         except requests.exceptions.Timeout as e:
             raise type(e)("{0}, Error trying to reach {1}".format(e.message, uri))
 
@@ -85,7 +85,7 @@ class Lims(object):
         else:
             raise ValueError("id or uri required")
         url = urljoin(self.baseuri, '/'.join(segments))
-        r=self.request_session.get(url, auth=(self.username, self.password), timeout=TIMEOUT)
+        r = self.request_session.get(url, auth=(self.username, self.password), timeout=TIMEOUT)
         self.validate_response(r)
         return r.text
 
@@ -95,7 +95,7 @@ class Lims(object):
         if not os.path.isfile(file_to_upload):
             raise IOError("{} not found".format(file_to_upload))
 
-        #Request the storage space on glsstorage
+        # Request the storage space on glsstorage
         # Create the xml to describe the file
         root = ElementTree.Element(nsmap('file:file'))
         s = ElementTree.SubElement(root, 'attached-to')
@@ -107,20 +107,19 @@ class Lims(object):
                 data=self.tostring(ElementTree.ElementTree(root))
         )
 
-        #Create the file object
+        # Create the file object
         root = self.post(
                 uri=self.get_uri('files'),
                 data=self.tostring(ElementTree.ElementTree(root))
         )
         file = File(self, uri=root.attrib['uri'])
 
-        #Actually upload the file
+        # Actually upload the file
         uri = self.get_uri('files', file.id, 'upload')
-        r = requests.post(uri, files= {'file':(file_to_upload, open(file_to_upload, 'rb'))},
+        r = requests.post(uri, files={'file': (file_to_upload, open(file_to_upload, 'rb'))},
                           auth=(self.username, self.password))
         self.validate_response(r)
         return file
-
 
     def put(self, uri, data, params=dict()):
         """PUT the serialized XML to the given URI.
@@ -128,7 +127,7 @@ class Lims(object):
         """
         r = requests.put(uri, data=data, params=params,
                          auth=(self.username, self.password),
-                         headers={'content-type':'application/xml',
+                         headers={'content-type': 'application/xml',
                                   'accept': 'application/xml'})
         return self.parse_response(r)
 
@@ -140,7 +139,7 @@ class Lims(object):
                           auth=(self.username, self.password),
                           headers={'content-type': 'application/xml',
                                    'accept': 'application/xml'})
-        return self.parse_response(r, accept_status_codes = [200, 201, 202])
+        return self.parse_response(r, accept_status_codes=[200, 201, 202])
 
     def check_version(self):
         """Raise ValueError if the version for this interface
@@ -155,7 +154,7 @@ class Lims(object):
             if node.attrib['major'] == self.VERSION: return
         raise ValueError('version mismatch')
 
-    def validate_response(self, response, accept_status_codes = [200]):
+    def validate_response(self, response, accept_status_codes=[200]):
         """Parse the XML returned in the response.
         Raise an HTTP error if the response status is not one of the
         specified accepted status codes.
@@ -170,12 +169,12 @@ class Lims(object):
                 node = root.find('suggested-actions')
                 if node is not None:
                     message += ' ' + node.text
-            except ElementTree.ParseError: # some error messages might not follow the xml standard
-                message=response.content
+            except ElementTree.ParseError:  # some error messages might not follow the xml standard
+                message = response.content
             raise requests.exceptions.HTTPError(message)
         return True
 
-    def parse_response(self, response, accept_status_codes = [200]):
+    def parse_response(self, response, accept_status_codes=[200]):
         """Parse the XML returned in the response.
         Raise an HTTP error if the response status is not 200.
         """
@@ -183,7 +182,7 @@ class Lims(object):
         root = ElementTree.fromstring(response.content)
         return root
 
-    def get_udfs(self, name = None, attach_to_name = None, attach_to_category = None, start_index = None):
+    def get_udfs(self, name=None, attach_to_name=None, attach_to_category=None, start_index=None):
         """Get a list of udfs, filtered by keyword arguments.
         name: name of udf
         attach_to_name: item in the system, to wich the udf is attached, such as 
@@ -193,9 +192,9 @@ class Lims(object):
         start_index: Page to retrieve; all if None.
         """
         params = self._get_params(name=name,
-                                    attach_to_name=attach_to_name,
-                                    attach_to_category=attach_to_category,
-                                    start_index=start_index)
+                                  attach_to_name=attach_to_name,
+                                  attach_to_category=attach_to_category,
+                                  start_index=start_index)
         return self._get_instances(Udfconfig, params=params)
 
     def get_reagent_types(self, name=None, start_index=None):
@@ -226,7 +225,7 @@ class Lims(object):
 
     def get_researchers(self, firstname=None, lastname=None, username=None,
                         last_modified=None,
-                        udf=dict(), udtname=None, udt=dict(),start_index=None):
+                        udf=dict(), udtname=None, udt=dict(), start_index=None):
         """Get a list of researchers, filtered by keyword arguments.
         firstname: Researcher first name, or list of names.
         lastname: Researcher last name, or list of names.
@@ -266,7 +265,7 @@ class Lims(object):
         return self._get_instances(Project, params=params)
 
     def get_sample_number(self, name=None, projectname=None, projectlimsid=None,
-                    udf=dict(), udtname=None, udt=dict(), start_index=None):
+                          udf=dict(), udtname=None, udt=dict(), start_index=None):
         """Gets the number of samples matching the query without fetching every
         sample, so it should be faster than len(get_samples()"""
         params = self._get_params(name=name,
@@ -275,14 +274,13 @@ class Lims(object):
                                   start_index=start_index)
         params.update(self._get_params_udf(udf=udf, udtname=udtname, udt=udt))
         root = self.get(self.get_uri(Sample._URI), params=params)
-        total=0
-        while params.get('start-index') is None: # Loop over all pages.
-            total+=len(root.findall("sample"))
+        total = 0
+        while params.get('start-index') is None:  # Loop over all pages.
+            total += len(root.findall("sample"))
             node = root.find('next-page')
             if node is None: break
             root = self.get(node.attrib['uri'], params=params)
         return total
-
 
     def get_samples(self, name=None, projectname=None, projectlimsid=None,
                     udf=dict(), udtname=None, udt=dict(), start_index=None):
@@ -406,6 +404,27 @@ class Lims(object):
         params = self._get_params()
         return self._get_instances(Protocol, params=params)
 
+    def get_reagent_kits(self, name=None, start_index=None):
+        """Get a list of reagent kits, filtered by keyword arguments.
+        name: reagent kit  name, or list of names.
+        start_index: Page to retrieve; all if None.
+        """
+        params = self._get_params(name=name,
+                                  start_index=start_index)
+        return self._get_instances(ReagentKit, params=params)
+
+    def get_reagent_lots(self, name=None, kitname=None, number=None,
+                         start_index=None):
+        """Get a list of reagent lots, filtered by keyword arguments.
+        name: reagent kit  name, or list of names.
+        kitname: name of the kit this lots belong to
+        number: lot number or list of lot number
+        start_index: Page to retrieve; all if None.
+        """
+        params = self._get_params(name=name, kitname=kitname, number=number,
+                                  start_index=start_index)
+        return self._get_instances(ReagentLot, params=params)
+
     def _get_params(self, **kwargs):
         "Convert keyword arguments to a kwargs dictionary."
         result = dict()
@@ -431,7 +450,7 @@ class Lims(object):
         if tag is None:
             tag = klass.__name__.lower()
         root = self.get(self.get_uri(klass._URI), params=params)
-        while params.get('start-index') is None: # Loop over all pages.
+        while params.get('start-index') is None:  # Loop over all pages.
             for node in root.findall(tag):
                 result.append(klass(self, uri=node.attrib['uri']))
             node = root.find('next-page')
@@ -458,14 +477,14 @@ class Lims(object):
         if not instances:
             return []
         root = ElementTree.Element(nsmap('ri:links'))
-        needs_request=False
+        needs_request = False
         instance_map = {}
         for instance in instances:
             instance_map[instance.id] = instance
             if force or instance.root is None:
                 ElementTree.SubElement(root, 'link', dict(uri=instance.uri,
-                                                      rel=instance.__class__._URI))
-                needs_request=True
+                                                          rel=instance.__class__._URI))
+                needs_request = True
 
         if needs_request:
             uri = self.get_uri(instance.__class__._URI, 'batch/retrieve')
@@ -482,7 +501,7 @@ class Lims(object):
         if not instances:
             return
 
-        root = None # XML root element for batch request
+        root = None  # XML root element for batch request
 
         for instance in instances:
             if root is None:
@@ -518,8 +537,6 @@ class Lims(object):
                           headers={'content-type': 'application/xml',
                                    'accept': 'application/xml'})
         self.validate_response(r)
-
-
 
     def tostring(self, etree):
         "Return the ElementTree contents as a UTF-8 encoded XML string."

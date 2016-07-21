@@ -6,76 +6,41 @@ Per Kraulis, Science for Life Laboratory, Stockholm, Sweden.
 Copyright (C) 2012 Per Kraulis
 """
 
-import re
+from genologics.constants import nsmap
+from genologics.descriptors import StringDescriptor, StringDictionaryDescriptor, UdfDictionaryDescriptor, \
+    UdtDictionaryDescriptor, ExternalidListDescriptor, EntityDescriptor, BooleanDescriptor, EntityListDescriptor, \
+    StringAttributeDescriptor, StringListDescriptor, DimensionDescriptor, IntegerDescriptor, \
+    PlacementDictionaryDescriptor, InputOutputMapList, LocationDescriptor, ReagentLabelList, NestedEntityListDescriptor, \
+    NestedStringListDescriptor, NestedAttributeListDescriptor, IntegerAttributeDescriptor
+
 try:
     from urllib.parse import urlsplit, urlparse, parse_qs, urlunparse
 except ImportError:
     from urlparse import urlsplit, urlparse, parse_qs, urlunparse
 
-import datetime
-import time
 from xml.etree import ElementTree
+
 import logging
 
 logger = logging.getLogger(__name__)
 
-_NSMAP = dict(
-    art='http://genologics.com/ri/artifact',
-    artgr='http://genologics.com/ri/artifactgroup',
-    cnf='http://genologics.com/ri/configuration',
-    con='http://genologics.com/ri/container',
-    ctp='http://genologics.com/ri/containertype',
-    exc='http://genologics.com/ri/exception',
-    file='http://genologics.com/ri/file',
-    inst='http://genologics.com/ri/instrument',
-    lab='http://genologics.com/ri/lab',
-    prc='http://genologics.com/ri/process',
-    prj='http://genologics.com/ri/project',
-    prop='http://genologics.com/ri/property',
-    protcnf='http://genologics.com/ri/protocolconfiguration',
-    protstepcnf='http://genologics.com/ri/stepconfiguration',
-    prx='http://genologics.com/ri/processexecution',
-    ptm='http://genologics.com/ri/processtemplate',
-    ptp='http://genologics.com/ri/processtype',
-    res='http://genologics.com/ri/researcher',
-    ri='http://genologics.com/ri',
-    rt='http://genologics.com/ri/routing',
-    rtp='http://genologics.com/ri/reagenttype',
-    smp='http://genologics.com/ri/sample',
-    stg='http://genologics.com/ri/stage',
-    stp='http://genologics.com/ri/step',
-    udf='http://genologics.com/ri/userdefined',
-    ver='http://genologics.com/ri/version',
-    wkfcnf='http://genologics.com/ri/workflowconfiguration')
-
-for prefix, uri in _NSMAP.items():
-    ElementTree._namespace_map[uri] = prefix
-
-_NSPATTERN = re.compile(r'(\{)(.+?)(\})')
-
-def nsmap(tag):
-    "Convert from normal XML-ish namespace tag to ElementTree variant."
-    parts = tag.split(':')
-    if len(parts) != 2:
-        raise ValueError("no namespace specifier in tag")
-    return "{%s}%s" % (_NSMAP[parts[0]], parts[1])
-
 
 class SampleHistory:
     """Class handling the history generation for a given sample/artifact
-    AFAIK the only fields of the history that are read are proc.type and outart""" 
+    AFAIK the only fields of the history that are read are proc.type and outart"""
 
-    def __init__(self, sample_name=None, output_artifact=None, input_artifact=None, lims=None, pro_per_art=None, test=False):
-        self.processes_per_artifact=pro_per_art
+    def __init__(self, sample_name=None, output_artifact=None, input_artifact=None, lims=None, pro_per_art=None,
+                 test=False):
+        self.processes_per_artifact = pro_per_art
         if lims:
             self.lims = lims
             if not (test):
-                #this is now the default
-                self.sample_name=sample_name
+                # this is now the default
+                self.sample_name = sample_name
                 self.alternate_history(output_artifact, input_artifact)
-                self.art_map=None
+                self.art_map = None
             elif (sample_name) and pro_per_art:
-                self.sample_name=sample_name
+                self.sample_name = sample_name
                 self.make_sample_artifact_map()
                 if output_artifact:
                     self.get_analyte_hist_sorted(output_artifact, input_artifact)
@@ -83,710 +48,216 @@ class SampleHistory:
             logger.error("Tried to build History without lims")
             raise AttributeError("History cannot be computed without a valid lims object")
 
-
     def control(self):
         """this can be used to check the content of the object.
         """
         logger.info("SAMPLE NAME: {}".format(self.sample_name))
         logger.info("outart : {}".format(self.history_list[0]))
-        #logger.info ("\nmap :")
-        #for key, value in self.art_map.iteritems():
+        # logger.info ("\nmap :")
+        # for key, value in self.art_map.iteritems():
         #    logger.info(value[1]+"->"+value[0].id+"->"+key)
-        logger.info ("\nHistory :\n\n")
+        logger.info("\nHistory :\n\n")
         logger.info("Input\tProcess\tProcess info")
         for key, dict in self.history.items():
-            logger.info (key)
+            logger.info(key)
             for key2, dict2 in dict.items():
-                logger.info ("\t{}".format(key2))
+                logger.info("\t{}".format(key2))
                 for key, value in dict2.items():
-                    logger.info ("\t\t{0}->{1}".format(key,(value if value is not None else "None")))
-        logger.info ("\nHistory List")
+                    logger.info("\t\t{0}->{1}".format(key, (value if value is not None else "None")))
+        logger.info("\nHistory List")
         for art in self.history_list:
-            logger.info (art)
-        
+            logger.info(art)
+
     def make_sample_artifact_map(self):
-        """samp_art_map: connects each output artifact for a specific sample to its 
+        """samp_art_map: connects each output artifact for a specific sample to its
         corresponding process and input artifact assuming, for a given sample,
         one input -> one process -> one output
-        This function starts from the output, 
+        This function starts from the output,
         and creates an entry like this : output -> (process, input)"""
-        samp_art_map ={}
+        samp_art_map = {}
         if self.sample_name:
-            artifacts = self.lims.get_artifacts(sample_name = self.sample_name, type = 'Analyte', resolve=False) 
+            artifacts = self.lims.get_artifacts(sample_name=self.sample_name, type='Analyte', resolve=False)
             for one_art in artifacts:
                 input_arts = one_art.input_artifact_list()
                 for input_art in input_arts:
                     for samp in input_art.samples:
                         if samp.name == self.sample_name:
                             samp_art_map[one_art.id] = (one_art.parent_process, input_art.id)
+                            
+        self.art_map = samp_art_map
 
-        self.art_map=samp_art_map
-        
-        
     def alternate_history(self, out_art, in_art=None):
         """This is a try at another way to generate the history.
         This one iterates over Artifact.parent_process and Process.all_inputs()
         Then, it takes all the child processes for each input (because we want
-        qc processes too) and puts everything in a dictionnary. 
+        qc processes too) and puts everything in a dictionnary.
         """
         history = {}
         hist_list = []
-       #getting the list of all expected analytes.
-        artifacts = self.lims.get_artifacts(sample_name = self.sample_name, type = 'Analyte', resolve=False)
-        processes=[]
-        inputs=[]
+        # getting the list of all expected analytes.
+        artifacts = self.lims.get_artifacts(sample_name=self.sample_name, type='Analyte', resolve=False)
+        processes = []
+        inputs = []
         if in_art:
-            #If theres an input artifact given, I need to make a loop for this one, before treating it as an output
-            starting_art=in_art
+            # If theres an input artifact given, I need to make a loop for this one, before treating it as an output
+            starting_art = in_art
             inputs.append(in_art)
-            history[in_art]={}
-            #If there is a loacl map, use it. else, query the lims.
+            history[in_art] = {}
+            # If there is a loacl map, use it. else, query the lims.
             if self.processes_per_artifact and in_art in self.processes_per_artifact:
-                valid_pcs=self.processes_per_artifact[in_art]
+                valid_pcs = self.processes_per_artifact[in_art]
             else:
-                valid_pcs=self.lims.get_processes(inputartifactlimsid=in_art)
+                valid_pcs = self.lims.get_processes(inputartifactlimsid=in_art)
 
             for tempProcess in valid_pcs:
-                history[in_art][tempProcess.id] = {'date' : tempProcess.date_run,
-                                                   'id' : tempProcess.id,
-                                                   'outart' : (out_art if out_art in [ out.id for out in tempProcess.all_outputs()] else None ),
-                                                   'inart' : in_art,
-                                                   'type' : tempProcess.type.id,
-                                                   'name' : tempProcess.type.name}
+                history[in_art][tempProcess.id] = {'date': tempProcess.date_run,
+                                                   'id': tempProcess.id,
+                                                   'outart': (out_art if out_art in [out.id for out in tempProcess.all_outputs()] else None),
+                                                   'inart': in_art,
+                                                   'type': tempProcess.type.id,
+                                                   'name': tempProcess.type.name}
         else:
-            starting_art=out_art
-        #main iteration    
-        #it is quite heavy on logger at info level
-        not_done=True
+            starting_art = out_art
+        # main iteration
+        # it is quite heavy on logger at info level
+        not_done = True
         while not_done:
-            logger.info ("looking for "+(starting_art))
-            not_done=False 
+            logger.info("looking for " + (starting_art))
+            not_done = False
             for o in artifacts:
-                logger.info (o.id)
+                logger.info(o.id)
                 if o.id == starting_art:
                     if o.parent_process is None:
-                        #flow control : if there is no parent process, we can stop iterating, we're done.
-                        not_done=False
-                        break #breaks the for artifacts, we are done anyway.
+                        # flow control : if there is no parent process, we can stop iterating, we're done.
+                        not_done = False
+                        break  # breaks the for artifacts, we are done anyway.
                     else:
-                        not_done=True #keep the loop running
-                    logger.info ("found it")
+                        not_done = True  # keep the loop running
+                    logger.info("found it")
                     processes.append(o.parent_process)
-                    logger.info ("looking for inputs of "+o.parent_process.id)
+                    logger.info("looking for inputs of " + o.parent_process.id)
                     for i in o.parent_process.all_inputs():
-                        logger.info (i.id)
+                        logger.info(i.id)
                         if i in artifacts:
-                            history[i.id]={}
-                            for tempProcess in (self.processes_per_artifact[i.id] if self.processes_per_artifact else self.lims.get_processes(inputartifactlimsid=i.id)):#If there is a loacl map, use it. else, query the lims.
-                                history[i.id][tempProcess.id] = {'date' : tempProcess.date_run,
-                                                               'id' : tempProcess.id,
-                                                               'outart' : (o.id if tempProcess.id == o.parent_process.id else None),
-                                                               'inart' : i.id,
-                                                               'type' : tempProcess.type.id,
-                                                               'name' : tempProcess.type.name}
+                            history[i.id] = {}
+                            for tempProcess in (self.processes_per_artifact[i.id] if self.processes_per_artifact else self.lims.get_processes(inputartifactlimsid=i.id)):  # If there is a loacl map, use it. else, query the lims.
+                                history[i.id][tempProcess.id] = {'date': tempProcess.date_run,
+                                                                 'id': tempProcess.id,
+                                                                 'outart': (
+                                                                 o.id if tempProcess.id == o.parent_process.id else None),
+                                                                 'inart': i.id,
+                                                                 'type': tempProcess.type.id,
+                                                                 'name': tempProcess.type.name}
 
-
-
-                            logger.info ("found input "+i.id)
-                            inputs.append(i.id) #this will be the sorted list of artifacts used to rebuild the history in order
+                            logger.info("found input " + i.id)
+                            inputs.append(
+                                i.id)  # this will be the sorted list of artifacts used to rebuild the history in order
                             # while increment
-                            starting_art=i.id
-                            
-                            break #break the for allinputs, if we found the right one
-                    break # breaks the for artifacts if we matched the current one
-        self.history=history
-        self.history_list=inputs 
+                            starting_art = i.id
 
+                            break  # break the for allinputs, if we found the right one
+                    break  # breaks the for artifacts if we matched the current one
+        self.history = history
+        self.history_list = inputs
 
-    def get_analyte_hist_sorted(self, out_artifact, input_art = None):
-         """Makes a history map of an artifac, using the samp_art_map 
-         of the corresponding sample.
-         The samp_art_map object is built up from analytes. This means that it will not 
-         contain output-input info for processes wich have only files as output. 
-         This is logical since the samp_art_map object is used for building up the ANALYTE 
-         history of a sample. If you want to make the analyte history based on a 
-         resultfile, that is; if you want to give a resultfile as out_artifact here, 
-         and be given the historylist of analytes and processes for that file, you 
-         will also have to give the input artifact for the process that generated 
-         the resultfile for wich you want to get the history. In other words, if you 
-         want to get the History of the folowing scenario:        
- 
-         History --- > Input_analyte -> Process -> Output_result_file
-         
-         then the arguments to this function should be:
-         out_artifact = Output_result_file
-         input_art = Input_analyte
- 
-         If you instead want the History of the folowing scenario:
-         
-         History --- > Input_analyte -> Process -> Output_analyte
- 
-         then you can skip the input_art argument and only set:
-         out_artifact = Output_analyte 
-         """
-         history = {}
-         hist_list = []
-         if input_art:
+    def get_analyte_hist_sorted(self, out_artifact, input_art=None):
+        """Makes a history map of an artifac, using the samp_art_map
+        of the corresponding sample.
+        The samp_art_map object is built up from analytes. This means that it will not
+        contain output-input info for processes wich have only files as output.
+        This is logical since the samp_art_map object is used for building up the ANALYTE
+        history of a sample. If you want to make the analyte history based on a
+        resultfile, that is; if you want to give a resultfile as out_artifact here,
+        and be given the historylist of analytes and processes for that file, you
+        will also have to give the input artifact for the process that generated
+        the resultfile for wich you want to get the history. In other words, if you
+        want to get the History of the folowing scenario:
+
+        History --- > Input_analyte -> Process -> Output_result_file
+
+        then the arguments to this function should be:
+        out_artifact = Output_result_file
+        input_art = Input_analyte
+
+        If you instead want the History of the folowing scenario:
+
+        History --- > Input_analyte -> Process -> Output_analyte
+
+        then you can skip the input_art argument and only set:
+        out_artifact = Output_analyte
+        """
+        history = {}
+        hist_list = []
+        if input_art:
             # In_art = Artifact(lims,id=input_art)
             # try:
             #     pro = In_art.parent_process.id
             # except:
             #     pro = None
-             history, out_artifact = self._add_out_art_process_conection_list(input_art, 
-                                                         out_artifact, history)
-             hist_list.append(input_art)
-         while out_artifact in self.art_map:
-             pro, input_art = self.art_map[out_artifact]
-             hist_list.append(input_art)
-             history, out_artifact = self._add_out_art_process_conection_list(input_art, 
-                                                        out_artifact, history)
-         self.history=history
-         self.history_list=hist_list
- 
- 
-    def _add_out_art_process_conection_list(self, input_art, out_artifact, history = {}):
+
+            history, out_artifact = self._add_out_art_process_conection_list(input_art, out_artifact, history)
+            hist_list.append(input_art)
+        while out_artifact in self.art_map:
+            pro, input_art = self.art_map[out_artifact]
+            hist_list.append(input_art)
+            history, out_artifact = self._add_out_art_process_conection_list(input_art, out_artifact, history)
+        self.history = history
+        self.history_list = hist_list
+
+    def _add_out_art_process_conection_list(self, input_art, out_artifact, history={}):
         """This function populates the history dict with process info per artifact.
-        Maps an artifact to all the processes where its used as input and adds this 
-        info to the history dict. Observe that the output artifact for the input 
-        artifact in the historychain is given as input to this function. All 
-        processes that the input artifact has been involved in, but that are not 
+        Maps an artifact to all the processes where its used as input and adds this
+        info to the history dict. Observe that the output artifact for the input
+        artifact in the historychain is given as input to this function. All
+        processes that the input artifact has been involved in, but that are not
         part of the historychain get the outart set to None. This is very important."""
-        # Use the local process map if we have one, else, query the lims 
-        for process in self.processes_per_artifact[input_art] if self.processes_per_artifact else lims.get_processes(inputartifactlimsid = inart):
+        # Use the local process map if we have one, else, query the lims
+        for process in self.processes_per_artifact[input_art] if self.processes_per_artifact else lims.get_processes(
+                inputartifactlimsid=input_art):
             # outputs = map(lambda a: (a.id), process.all_outputs())
-            outputs = [a.id for a in process.all_outputs()] 
-            outart = out_artifact if out_artifact in outputs else None 
-            step_info = {'date' : process.date_run,
-                         'id' : process.id,
-                         'outart' : outart,
-                         'inart' : input_art,
-                         'type' : process.type.id,
-                         'name' : process.type.name}
+            outputs = [a.id for a in process.all_outputs()]
+            outart = out_artifact if out_artifact in outputs else None
+            step_info = {'date': process.date_run,
+                         'id': process.id,
+                         'outart': outart,
+                         'inart': input_art,
+                         'type': process.type.id,
+                         'name': process.type.name}
             if input_art in history:
                 history[input_art][process.id] = step_info
             else:
-                history[input_art] = {process.id : step_info}
+                history[input_art] = {process.id: step_info}
         return history, input_art
-
-
-class BaseDescriptor(object):
-    "Abstract base descriptor for an instance attribute."
-
-    def __get__(self, instance, cls):
-        raise NotImplementedError
-
-class TagDescriptor(BaseDescriptor):
-    """Abstract base descriptor for an instance attribute
-    represented by an XML element.
-    """
-
-    def __init__(self, tag):
-        self.tag = tag
-
-class StringDescriptor(TagDescriptor):
-    """An instance attribute containing a string value
-    represented by an XML element.
-    """
-
-    def __get__(self, instance, cls):
-        instance.get()
-        node = self.get_node(instance)
-        if node is None:
-            return None
-        else:
-            return node.text
-
-    def __set__(self, instance, value):
-        node = self.get_node(instance)
-        if node is None:
-            raise AttributeError("no element '%s' to set" % self.tag)
-        else:
-            node.text = value
-
-    def get_node(self, instance):
-        if self.tag:
-            return instance.root.find(self.tag)
-        else:
-            return instance.root
-
-
-class StringAttributeDescriptor(TagDescriptor):
-    """An instance attribute containing a string value
-    represented by an XML attribute.
-    """
-
-    def __get__(self, instance, cls):
-        instance.get()
-        return instance.root.attrib[self.tag]
-
-    def __set__(self, instance, value):
-        instance.root.attrib[self.tag] = value
-
-
-class StringListDescriptor(TagDescriptor):
-    """An instance attribute containing a list of strings
-    represented by multiple XML elements.
-    """
-
-    def __get__(self, instance, cls):
-        instance.get()
-        result = []
-        for node in instance.root.findall(self.tag):
-            result.append(node.text)
-        return result
-
-
-class StringDictionaryDescriptor(TagDescriptor):
-    """An instance attribute containing a dictionary of string key/values
-    represented by a hierarchical XML element.
-    """
-
-    def __get__(self, instance, cls):
-        instance.get()
-        result = dict()
-        node = instance.root.find(self.tag)
-        if node is not None:
-            for node2 in node.getchildren():
-                result[node2.tag] = node2.text
-        return result
-
-
-class IntegerDescriptor(StringDescriptor):
-    """An instance attribute containing an integer value
-    represented by an XMl element.
-    """
-
-    def __get__(self, instance, cls):
-        instance.get()
-        node = self.get_node(instance)
-        if node is None:
-            return None
-        else:
-            return int(node.text)
-
-class IntegerAttributeDescriptor(TagDescriptor):
-    """An instance attribute containing a integer value
-    represented by an XML attribute.
-    """
-
-    def __get__(self, instance, cls):
-        instance.get()
-        return int(instance.root.attrib[self.tag])
-
-class BooleanDescriptor(StringDescriptor):
-    """An instance attribute containing a boolean value
-    represented by an XMl element.
-    """
-
-    def __get__(self, instance, cls):
-        instance.get()
-        node = self.get_node(instance)
-        if node is None:
-            return None
-        else:
-            return node.text.lower() == 'true'
-
-
-class UdfDictionary(object):
-    "Dictionary-like container of UDFs, optionally within a UDT."
-
-    def _is_string(self, value):
-        try:
-            return isinstance(value, basestring)
-        except:
-            return isinstance(value, str)
-
-    def __init__(self, instance, udt=False):
-        self.instance = instance
-        self._udt = udt
-        self._update_elems()
-        self._prepare_lookup()
-        self.location=0
-
-    def get_udt(self):
-        if self._udt == True:
-            return None
-        else:
-            return self._udt
-
-    def set_udt(self, name):
-        assert isinstance(name, str)
-        if not self._udt:
-            raise AttributeError('cannot set name for a UDF dictionary')
-        self._udt = name
-        elem = self.instance.root.find(nsmap('udf:type'))
-        assert elem is not None
-        elem.set('name', name)
-
-    udt = property(get_udt, set_udt)
-
-    def _update_elems(self):
-        self._elems = []
-        if self._udt:
-            elem = self.instance.root.find(nsmap('udf:type'))
-            if elem is not None:
-                self._udt = elem.attrib['name']
-                self._elems = elem.findall(nsmap('udf:field'))
-        else:
-            tag = nsmap('udf:field')
-            for elem in self.instance.root.getchildren():
-                if elem.tag == tag:
-                    self._elems.append(elem)
-
-    def _prepare_lookup(self):
-        self._lookup = dict()
-        for elem in self._elems:
-            type = elem.attrib['type'].lower()
-            value = elem.text
-            if not value:
-                value = None
-            elif type == 'numeric':
-                try:
-                    value = int(value)
-                except ValueError:
-                    value = float(value)
-            elif type == 'boolean':
-                value = value == 'true'
-            elif type == 'date':
-                value = datetime.date(*time.strptime(value, "%Y-%m-%d")[:3])
-            self._lookup[elem.attrib['name']] = value
-
-    def __contains__(self,key):
-        try:
-            self._lookup[key]
-        except KeyError:
-            return False
-        return True
-
-    def __getitem__(self, key):
-        return self._lookup[key]
-
-    def __setitem__(self, key, value):
-        self._lookup[key] = value
-        for node in self._elems:
-            if node.attrib['name'] != key: continue
-            vtype = node.attrib['type'].lower()
-
-            if value is None:
-                pass
-            elif vtype == 'string':
-                if not self._is_string(value):
-                    raise TypeError('String UDF requires str or unicode value')
-            elif vtype == 'str':
-                if not self._is_string(value):
-                    raise TypeError('String UDF requires str or unicode value')
-            elif vtype == 'text':
-                if not self._is_string(value):
-                    raise TypeError('Text UDF requires str or unicode value')
-            elif vtype == 'numeric':
-                if not isinstance(value, (int, float)):
-                    raise TypeError('Numeric UDF requires int or float value')
-                value = str(value)
-            elif vtype == 'boolean':
-                if not isinstance(value, bool):
-                    raise TypeError('Boolean UDF requires bool value')
-                value = value and 'True' or 'False'
-            elif vtype == 'date':
-                if not isinstance(value, datetime.date): # Too restrictive?
-                    raise TypeError('Date UDF requires datetime.date value')
-                value = str(value)
-            elif vtype == 'uri':
-                if not isinstance(value, str):
-                    raise TypeError('URI UDF requires str or punycode (unicode) value')
-                value = str(value)
-            else:
-                raise NotImplemented("UDF type '%s'" % vtype)
-            if not isinstance(value, str):
-                value = str(value).encode('UTF-8')
-            node.text = value
-            break
-        else:                           # Create new entry; heuristics for type
-            if self._is_string(value):
-                vtype = '\n' in value and 'Text' or 'String'
-            elif isinstance(value, bool):
-                vtype = 'Boolean'
-                value = value and 'True' or 'False'
-            elif isinstance(value, (int, float)):
-                vtype = 'Numeric'
-            elif isinstance(value, datetime.date):
-                vtype = 'Date'
-                value = str(value)
-            else:
-                raise NotImplementedError("Cannot handle value of type '%s'"
-                                          " for UDF" % type(value))
-            if self._udt:
-                root = self.instance.root.find(nsmap('udf:type'))
-            else:
-                root = self.instance.root
-            elem = ElementTree.SubElement(root,
-                                          nsmap('udf:field'),
-                                          type=vtype,
-                                          name=key)
-            if not isinstance(value, str):
-                value =str(value).encode('UTF-8')
-            elem.text = value
-
-    def __delitem__(self, key):
-        del self._lookup[key]
-        for node in self._elems:
-            if node.attrib['name'] == key:
-                self.instance.root.remove(node)
-                break
-
-    def items(self):
-        return list(self._lookup.items())
-
-    def clear(self):
-        for elem in self._elems:
-            self.instance.root.remove(elem)
-        self._update_elems()
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        try:
-            ret=list(self._lookup.keys())[self.location]
-        except IndexError:
-            raise StopIteration()
-        self.location = self.location + 1
-        return ret
-
-    def get(self, key, default=None):
-        return self._lookup.get(key, default)
-
-
-class UdfDictionaryDescriptor(BaseDescriptor):
-    """An instance attribute containing a dictionary of UDF values
-    represented by multiple XML elements.
-    """
-
-    _UDT = False
-
-    def __get__(self, instance, cls):
-        instance.get()
-        self.value = UdfDictionary(instance, udt=self._UDT)
-        return self.value
-
-
-class UdtDictionaryDescriptor(UdfDictionaryDescriptor):
-    """An instance attribute containing a dictionary of UDF values
-    in a UDT represented by multiple XML elements.
-    """
-
-    _UDT = True
-
-
-class PlacementDictionaryDescriptor(TagDescriptor):
-    """An instance attribute containing a dictionary of locations
-    keys and artifact values represented by multiple XML elements.
-    """
-
-    def __get__(self, instance, cls):
-        instance.get()
-        self.value = dict()
-        for node in instance.root.findall(self.tag):
-            key = node.find('value').text
-            self.value[key] = Artifact(instance.lims,uri=node.attrib['uri'])
-        return self.value
-
-
-class ExternalidListDescriptor(BaseDescriptor):
-    """An instance attribute yielding a list of tuples (id, uri) for
-    external identifiers represented by multiple XML elements.
-    """
-
-    def __get__(self, instance, cls):
-        instance.get()
-        result = []
-        for node in instance.root.findall(nsmap('ri:externalid')):
-            result.append((node.attrib.get('id'), node.attrib.get('uri')))
-        return result
-
-
-class EntityDescriptor(TagDescriptor):
-    "An instance attribute referencing another entity instance."
-
-    def __init__(self, tag, klass):
-        super(EntityDescriptor, self).__init__(tag)
-        self.klass = klass
-
-    def __get__(self, instance, cls):
-        instance.get()
-        node = instance.root.find(self.tag)
-        if node is None:
-            return None
-        else:
-            return self.klass(instance.lims, uri=node.attrib['uri'])
-
-
-class EntityListDescriptor(EntityDescriptor):
-    """An instance attribute yielding a list of entity instances
-    represented by multiple XML elements.
-    """
-
-    def __get__(self, instance, cls):
-        instance.get()
-        result = []
-        for node in instance.root.findall(self.tag):
-            result.append(self.klass(instance.lims, uri=node.attrib['uri']))
-
-        return result
-
-
-class NestedAttributeListDescriptor(StringAttributeDescriptor):
-    """An instance yielding a list of dictionnaries of attributes
-       for a nested xml list of XML elements"""
-    def __init__(self, tag, *args):
-        super(StringAttributeDescriptor, self).__init__(tag)
-        self.tag      = tag
-        self.rootkeys = args
-
-    def __get__(self, instance, cls):
-        instance.get()
-        result = []
-        rootnode=instance.root
-        for rootkey in self.rootkeys:
-            rootnode=rootnode.find(rootkey)
-        for node in rootnode.findall(self.tag):
-            result.append(node.attrib)
-        return result
-
-
-class NestedStringListDescriptor(StringListDescriptor):
-    """An instance yielding a list of strings
-        for a nested list of xml elements"""
-    def __init__(self, tag, *args):
-        super(StringListDescriptor, self).__init__(tag)
-        self.tag      = tag
-        self.rootkeys = args
-
-    def __get__(self, instance, cls):
-        instance.get()
-        result = []
-        rootnode=instance.root
-        for rootkey in self.rootkeys:
-            rootnode=rootnode.find(rootkey)
-        for node in rootnode.findall(self.tag):
-            result.append(node.text)
-        return result
-
-
-class NestedEntityListDescriptor(EntityListDescriptor):
-    """same as EntityListDescriptor, but works on nested elements"""
-
-    def __init__(self, tag, klass, *args):
-        super(EntityListDescriptor, self).__init__(tag, klass)
-        self.klass    = klass
-        self.tag      = tag
-        self.rootkeys = args
-
-    def __get__(self, instance, cls):
-        instance.get()
-        result = []
-        rootnode=instance.root
-        for rootkey in self.rootkeys:
-            rootnode=rootnode.find(rootkey)
-        for node in rootnode.findall(self.tag):
-            result.append(self.klass(instance.lims, uri=node.attrib['uri']))
-        return result
-
-
-class DimensionDescriptor(TagDescriptor):
-    """An instance attribute containing a dictionary specifying
-    the properties of a dimension of a container type.
-    """
-
-    def __get__(self, instance, cls):
-        instance.get()
-        node = instance.root.find(self.tag)
-        return dict(is_alpha = node.find('is-alpha').text.lower() == 'true',
-                    offset = int(node.find('offset').text),
-                    size = int(node.find('size').text))
-
-
-class LocationDescriptor(TagDescriptor):
-    """An instance attribute containing a tuple (container, value)
-    specifying the location of an analyte in a container.
-    """
-
-    def __get__(self, instance, cls):
-        instance.get()
-        node = instance.root.find(self.tag)
-        uri = node.find('container').attrib['uri']
-        return Container(instance.lims, uri=uri), node.find('value').text
-
-
-class ReagentLabelList(BaseDescriptor):
-    """An instance attribute yielding a list of reagent labels"""
-    def __get__(self, instance, cls):
-        instance.get()
-        self.value = []
-        for node in instance.root.findall('reagent-label'):
-            try:
-                self.value.append(node.attrib['name'])
-            except:
-                pass
-        return self.value
-
-
-class InputOutputMapList(BaseDescriptor):
-    """An instance attribute yielding a list of tuples (input, output)
-    where each item is a dictionary, representing the input/output
-    maps of a Process instance.
-    """
-
-    def __get__(self, instance, cls):
-        instance.get()
-        self.value = []
-        for node in instance.root.findall('input-output-map'):
-            input = self.get_dict(instance.lims, node.find('input'))
-            output = self.get_dict(instance.lims, node.find('output'))
-            self.value.append((input, output))
-        return self.value
-
-    def get_dict(self, lims, node):
-        if node is None: return None
-        result = dict()
-        for key in ['limsid', 'output-type', 'output-generation-type']:
-            try:
-                result[key] = node.attrib[key]
-            except KeyError:
-                pass
-            for uri in ['uri', 'post-process-uri']:
-                try:
-                    result[uri] = Artifact(lims, uri=node.attrib[uri])
-                except KeyError:
-                    pass
-        node = node.find('parent-process')
-        if node is not None:
-            result['parent-process'] = Process(lims, node.attrib['uri'])
-        return result
-
 
 class Entity(object):
     "Base class for the entities in the LIMS database."
 
     _TAG = None
     _URI = None
+    _PREFIX = None
 
-    def __new__(cls, lims, uri=None, id=None):
+    def __new__(cls, lims, uri=None, id=None, _create_new=False):
         if not uri:
-            if not id:
-                raise ValueError("Entity uri and id can't be both None")
-            else:
+            if id:
                 uri = lims.get_uri(cls._URI, id)
+            elif _create_new:
+                # create the Object without id or uri
+                pass
+            else:
+                raise ValueError("Entity uri and id can't be both None")
         try:
             return lims.cache[uri]
         except KeyError:
             return object.__new__(cls)
 
-    def __init__(self, lims, uri=None, id=None):
-        assert uri or id
-        if hasattr(self, 'lims'): return
-        if not uri:
-            uri = lims.get_uri(self._URI, id)
-        lims.cache[uri] = self
+    def __init__(self, lims, uri=None, id=None, _create_new=False):
+        assert uri or id or _create_new
+        if not _create_new:
+            if hasattr(self, 'lims'): return
+            if not uri:
+                uri = lims.get_uri(self._URI, id)
+            lims.cache[uri] = self
+            self.root = None
         self.lims = lims
         self._uri = uri
         self.root = None
@@ -830,11 +301,30 @@ class Entity(object):
         data = self.lims.tostring(ElementTree.ElementTree(self.root))
         self.lims.post(self.uri, data)
 
+    @classmethod
+    def create(cls, lims, **kwargs):
+        """Create an instance from attributes then post it to the LIMS"""
+        instance = cls(lims, _create_new=True)
+        if cls._TAG:
+            instance.root = ElementTree.Element(nsmap(cls._PREFIX + ':' + cls._TAG))
+        else:
+            instance.root = ElementTree.Element(nsmap(cls._PREFIX + ':' + cls.__name__.lower()))
+        for attribute in kwargs:
+            if hasattr(instance, attribute):
+                setattr(instance, attribute, kwargs.get(attribute))
+            else:
+                raise TypeError("%s create: got an unexpected keyword argument '%s'" % (cls.__name__, attribute))
+        data = lims.tostring(ElementTree.ElementTree(instance.root))
+        instance.root = lims.post(uri=lims.get_uri(cls._URI), data=data)
+        instance._uri = instance.root.attrib['uri']
+        return instance
+
 
 class Lab(Entity):
     "Lab; container of researchers."
 
     _URI = 'labs'
+    _PREFIX = 'lab'
 
     name             = StringDescriptor('name')
     billing_address  = StringDictionaryDescriptor('billing-address')
@@ -849,6 +339,7 @@ class Researcher(Entity):
     "Person; client scientist or lab personnel. Associated with a lab."
 
     _URI = 'researchers'
+    _PREFIX = 'res'
 
     first_name  = StringDescriptor('first-name')
     last_name   = StringDescriptor('last-name')
@@ -860,20 +351,23 @@ class Researcher(Entity):
     udf         = UdfDictionaryDescriptor()
     udt         = UdtDictionaryDescriptor()
     externalids = ExternalidListDescriptor()
+
     # credentials XXX
 
     @property
     def name(self):
         return "%s %s" % (self.first_name, self.last_name)
 
+
 class Reagent_label(Entity):
     """Reagent label element"""
     reagent_label = StringDescriptor('reagent-label')
 
+
 class Note(Entity):
     "Note attached to a project or a sample."
 
-    content = StringDescriptor(None)    # root element
+    content = StringDescriptor(None)  # root element
 
 
 class File(Entity):
@@ -889,16 +383,17 @@ class Project(Entity):
     "Project concerning a number of samples; associated with a researcher."
 
     _URI = 'projects'
+    _PREFIX = 'prj'
 
-    name          = StringDescriptor('name')
-    open_date     = StringDescriptor('open-date')
-    close_date    = StringDescriptor('close-date')
-    invoice_date  = StringDescriptor('invoice-date')
-    researcher    = EntityDescriptor('researcher', Researcher)
-    udf           = UdfDictionaryDescriptor()
-    udt           = UdtDictionaryDescriptor()
-    files         = EntityListDescriptor(nsmap('file:file'), File)
-    externalids   = ExternalidListDescriptor()
+    name         = StringDescriptor('name')
+    open_date    = StringDescriptor('open-date')
+    close_date   = StringDescriptor('close-date')
+    invoice_date = StringDescriptor('invoice-date')
+    researcher   = EntityDescriptor('researcher', Researcher)
+    udf          = UdfDictionaryDescriptor()
+    udt          = UdtDictionaryDescriptor()
+    files        = EntityListDescriptor(nsmap('file:file'), File)
+    externalids  = ExternalidListDescriptor()
     # permissions XXX
 
 
@@ -906,6 +401,7 @@ class Sample(Entity):
     "Customer's sample to be analyzed; associated with a project."
 
     _URI = 'samples'
+    _PREFIX = 'smp'
 
     name           = StringDescriptor('name')
     date_received  = StringDescriptor('date-received')
@@ -926,6 +422,7 @@ class Containertype(Entity):
 
     _TAG = 'container-type'
     _URI = 'containertypes'
+    _PREFIX = 'ctp'
 
     name              = StringAttributeDescriptor('name')
     calibrant_wells   = StringListDescriptor('calibrant-well')
@@ -938,6 +435,7 @@ class Container(Entity):
     "Container for analyte artifacts."
 
     _URI = 'containers'
+    _PREFIX = 'con'
 
     name           = StringDescriptor('name')
     type           = EntityDescriptor('type', Containertype)
@@ -956,11 +454,11 @@ class Container(Entity):
 
 
 class Processtype(Entity):
-
     _TAG = 'process-type'
     _URI = 'processtypes'
+    _PREFIX = 'ptp'
 
-    name              = StringAttributeDescriptor('name')
+    name = StringAttributeDescriptor('name')
     # XXX
 
 
@@ -968,31 +466,41 @@ class Udfconfig(Entity):
     "Instance of field type (cnf namespace)."
     _URI = 'configuration/udfs'
 
-    name = StringDescriptor('name')
-    attach_to_name = StringDescriptor('attach-to-name')
-    attach_to_category = StringDescriptor('attach-to-category')
+    name                          = StringDescriptor('name')
+    attach_to_name                = StringDescriptor('attach-to-name')
+    attach_to_category            = StringDescriptor('attach-to-category')
+    show_in_lablink               = BooleanDescriptor('show-in-lablink')
+    allow_non_preset_values       = BooleanDescriptor('allow-non-preset-values')
+    first_preset_is_default_value = BooleanDescriptor('first-preset-is-default-value')
+    show_in_tables                = BooleanDescriptor('show-in-tables')
+    is_editable                   = BooleanDescriptor('is-editable')
+    is_deviation                  = BooleanDescriptor('is-deviation') 
+    is_controlled_vocabulary      = BooleanDescriptor('is-controlled-vocabulary')
+    presets                       = StringListDescriptor('preset') 
+
 
 
 class Process(Entity):
     "Process (instance of Processtype) executed producing ouputs from inputs."
 
     _URI = 'processes'
+    _PREFIX = 'prc'
 
-    type          = EntityDescriptor('type', Processtype)
-    date_run      = StringDescriptor('date-run')
-    technician    = EntityDescriptor('technician', Researcher)
-    protocol_name = StringDescriptor('protocol-name')
+    type              = EntityDescriptor('type', Processtype)
+    date_run          = StringDescriptor('date-run')
+    technician        = EntityDescriptor('technician', Researcher)
+    protocol_name     = StringDescriptor('protocol-name')
     input_output_maps = InputOutputMapList()
-    udf            = UdfDictionaryDescriptor()
-    udt            = UdtDictionaryDescriptor()
-    files          = EntityListDescriptor(nsmap('file:file'), File)
+    udf               = UdfDictionaryDescriptor()
+    udt               = UdtDictionaryDescriptor()
+    files             = EntityListDescriptor(nsmap('file:file'), File)
 
     # instrument XXX
     # process_parameters XXX
 
-    def outputs_per_input(self, inart, ResultFile = False, SharedResultFile = False,  Analyte = False):
+    def outputs_per_input(self, inart, ResultFile=False, SharedResultFile=False, Analyte=False):
         """Getting all the output artifacts related to a particual input artifact"""
-        
+
         inouts = [io for io in self.input_output_maps if io[0]['limsid'] == inart]
         if ResultFile:
             inouts = [io for io in inouts if io[1]['output-type'] == 'ResultFile']
@@ -1012,36 +520,36 @@ class Process(Entity):
                 if samp.name == sample and inp not in ins:
                     ins.append(inp)
         return ins
-    
-    def all_inputs(self,unique=True, resolve=False):
+
+    def all_inputs(self, unique=True, resolve=False):
         """Retrieving all input artifacts from input_output_maps
         if unique is true, no duplicates are returned.
         """
-        #if the process has no input, that is not standard and we want to know about it
+        # if the process has no input, that is not standard and we want to know about it
         try:
             ids = [io[0]['limsid'] for io in self.input_output_maps]
         except TypeError:
-            logger.error("Process ",self," has no input artifacts")
+            logger.error("Process ", self, " has no input artifacts")
             raise TypeError
         if unique:
             ids = list(frozenset(ids))
         if resolve:
-            return self.lims.get_batch([Artifact(self.lims,id=id) for id in ids if id is not None])
+            return self.lims.get_batch([Artifact(self.lims, id=id) for id in ids if id is not None])
         else:
-            return [Artifact(self.lims,id=id) for id in ids if id is not None]
+            return [Artifact(self.lims, id=id) for id in ids if id is not None]
 
-    def all_outputs(self,unique=True, resolve=False):
+    def all_outputs(self, unique=True, resolve=False):
         """Retrieving all output artifacts from input_output_maps
         if unique is true, no duplicates are returned.
         """
-        #Given how ids is structured, io[1] might be None : some process don't have an output.
+        # Given how ids is structured, io[1] might be None : some process don't have an output.
         ids = [io[1]['limsid'] for io in self.input_output_maps if io[1] is not None]
         if unique:
             ids = list(frozenset(ids))
         if resolve:
-            return  self.lims.get_batch([Artifact(self.lims,id=id) for id in ids if id is not None])
+            return self.lims.get_batch([Artifact(self.lims, id=id) for id in ids if id is not None])
         else:
-            return  [Artifact(self.lims,id=id) for id in ids if id is not None]
+            return [Artifact(self.lims, id=id) for id in ids if id is not None]
 
     def shared_result_files(self):
         """Retreve all resultfiles of output-generation-type PerAllInputs."""
@@ -1089,6 +597,7 @@ class Artifact(Entity):
     "Any process input or output; analyte or file."
 
     _URI = 'artifacts'
+    _PREFIX = 'art'
 
     name           = StringDescriptor('name')
     type           = StringDescriptor('type')
@@ -1103,16 +612,17 @@ class Artifact(Entity):
     udf            = UdfDictionaryDescriptor()
     files          = EntityListDescriptor(nsmap('file:file'), File)
     reagent_labels = ReagentLabelList()
+
     # artifact_flags XXX
     # artifact_groups XXX
 
     def input_artifact_list(self):
         """Returns the input artifact ids of the parrent process."""
-        input_artifact_list=[]
+        input_artifact_list = []
         try:
             for tuple in self.parent_process.input_output_maps:
                 if tuple[1]['limsid'] == self.id:
-                    input_artifact_list.append(tuple[0]['uri'])#['limsid'])
+                    input_artifact_list.append(tuple[0]['uri'])  # ['limsid'])
         except:
             pass
         return input_artifact_list
@@ -1138,7 +648,7 @@ class Artifact(Entity):
         "returns the artefact independently of it's state"
         parts = urlparse(self.uri)
         if 'state' in parts[4]:
-            stateless_uri=urlunparse([parts[0],parts[1], parts[2], parts[3], '',''])
+            stateless_uri = urlunparse([parts[0], parts[1], parts[2], parts[3], '', ''])
             return Artifact(self.lims, uri=stateless_uri)
         else:
             return self
@@ -1147,62 +657,75 @@ class Artifact(Entity):
     state = property(get_state)
     stateless = property(stateless)
 
+    def _get_workflow_stages_and_statuses(self):
+        self.get()
+        result = []
+        rootnode = self.root.find('workflow-stages')
+        for node in rootnode.findall('workflow-stage'):
+            result.append((Stage(self.lims, uri=node.attrib['uri']), node.attrib['status'], node.attrib['name']))
+        return result
+
+    workflow_stages_and_statuses = property(_get_workflow_stages_and_statuses)
+
 
 class StepPlacements(Entity):
     """Placements from within a step. Supports POST"""
-    _placementslist= None
-    #[[A,(C,'A:1')][A,(C,'A:2')]] where A is an Artifact and C a Container
+    _placementslist = None
+
+    # [[A,(C,'A:1')][A,(C,'A:2')]] where A is an Artifact and C a Container
     def get_placement_list(self):
         if not self._placementslist:
-            #Only fetch the data once.
+            # Only fetch the data once.
             self.get()
-            self._placementslist= []
+            self._placementslist = []
             for node in self.root.find('output-placements').findall('output-placement'):
                 input = Artifact(self.lims, uri=node.attrib['uri'])
-                location=(None, None)
+                location = (None, None)
                 if node.find('location'):
                     location = (
-                        Container( self.lims, uri=node.find('location').find('container').attrib['uri']),
+                        Container(self.lims, uri=node.find('location').find('container').attrib['uri']),
                         node.find('location').find('value').text
                     )
                 self._placementslist.append([input, location])
         return self._placementslist
 
     def set_placement_list(self, value):
-        containers=set()
+        containers = set()
         self.get_placement_list()
         for node in self.root.find('output-placements').findall('output-placement'):
             for pair in value:
-                art=pair[0]
-                if art.uri==node.attrib['uri']:
-                    location=pair[1]
-                    workset=location[0]
-                    well=location[1]
+                art = pair[0]
+                if art.uri == node.attrib['uri']:
+                    location = pair[1]
+                    workset = location[0]
+                    well = location[1]
                     if workset and location:
                         containers.add(workset)
                         if node.find('location') is not None:
-                            cont_el=node.find('location').find('container')
-                            cont_el.attrib['uri']=workset.uri
-                            cont_el.attrib['limsid']=workset.id
-                            value_el=node.find('location').find('value')
-                            value_el.text=well
+                            cont_el = node.find('location').find('container')
+                            cont_el.attrib['uri'] = workset.uri
+                            cont_el.attrib['limsid'] = workset.id
+                            value_el = node.find('location').find('value')
+                            value_el.text = well
                         else:
-                            loc_el=ElementTree.SubElement(node, 'location')
-                            cont_el=ElementTree.SubElement(loc_el, 'container', {'uri': workset.uri, 'limsid' : workset.id})
-                            well_el=ElementTree.SubElement(loc_el, 'value')
-                            well_el.text=well #not supported in the constructor
-        #Handle selected containers
-        sc=self.root.find("selected-containers")
+                            loc_el = ElementTree.SubElement(node, 'location')
+                            cont_el = ElementTree.SubElement(loc_el, 'container',
+                                                             {'uri': workset.uri, 'limsid': workset.id})
+                            well_el = ElementTree.SubElement(loc_el, 'value')
+                            well_el.text = well  # not supported in the constructor
+        # Handle selected containers
+        sc = self.root.find("selected-containers")
         sc.clear()
         for cont in containers:
             ElementTree.SubElement(sc, 'container', uri=cont.uri)
-        self._placementslist=value
+        self._placementslist = value
 
-    placement_list=property(get_placement_list, set_placement_list)
+    placement_list = property(get_placement_list, set_placement_list)
 
-    _selected_containers=None
+    _selected_containers = None
+
     def get_selected_containers(self):
-        _selected_containers=[]
+        _selected_containers = []
         if not _selected_containers:
             self.get()
             for node in self.root.find('selected-containers').findall('container'):
@@ -1210,9 +733,7 @@ class StepPlacements(Entity):
 
         return _selected_containers
 
-    selected_containers=property(get_selected_containers)
-
-
+    selected_containers = property(get_selected_containers)
 
 
 class StepActions(Entity):
@@ -1223,20 +744,22 @@ class StepActions(Entity):
     def escalation(self):
         if not self._escalation:
             self.get()
-            self._escalation={}
+            self._escalation = {}
             for node in self.root.findall('escalation'):
-                self._escalation['artifacts']=[]
-                self._escalation['author']=Researcher(self.lims,uri=node.find('request').find('author').attrib.get('uri'))
-                self._escalation['request']=uri=node.find('request').find('comment').text
-                if node.find('review') is not None: #recommended by the Etree doc
-                    self._escalation['status']='Reviewed'
-                    self._escalation['reviewer']= Researcher(self.lims,uri=node.find('review').find('author').attrib.get('uri'))
-                    self._escalation['answer']=uri=node.find('review').find('comment').text
+                self._escalation['artifacts'] = []
+                self._escalation['author'] = Researcher(self.lims,
+                                                        uri=node.find('request').find('author').attrib.get('uri'))
+                self._escalation['request'] = uri = node.find('request').find('comment').text
+                if node.find('review') is not None:  # recommended by the Etree doc
+                    self._escalation['status'] = 'Reviewed'
+                    self._escalation['reviewer'] = Researcher(self.lims,
+                                                              uri=node.find('review').find('author').attrib.get('uri'))
+                    self._escalation['answer'] = uri = node.find('review').find('comment').text
                 else:
-                    self._escalation['status']='Pending'
+                    self._escalation['status'] = 'Pending'
 
                 for node2 in node.findall('escalated-artifacts'):
-                    art= self.lims.get_batch([Artifact(self.lims, uri=ch.attrib.get('uri')) for ch in node2])
+                    art = self.lims.get_batch([Artifact(self.lims, uri=ch.attrib.get('uri')) for ch in node2])
                     self._escalation['artifacts'].extend(art)
         return self._escalation
 
@@ -1251,39 +774,41 @@ class StepActions(Entity):
                     'action': node.attrib.get('action'),
                 }
                 if node.attrib.get('step-uri'):
-                    action['step']=Step(self.lims, uri=node.attrib.get('step-uri'))
+                    action['step'] = Step(self.lims, uri=node.attrib.get('step-uri'))
                 if node.attrib.get('rework-step-uri'):
-                    action['rework-step']=Step(self.lims, uri=node.attrib.get('rework-step-uri'))
+                    action['rework-step'] = Step(self.lims, uri=node.attrib.get('rework-step-uri'))
                 actions.append(action)
         return actions
 
 
 class ReagentKit(Entity):
     """Type of Reagent with information about the provider"""
-    _URI="reagenttypes"
-    _TAG="reagent-kit"
+    _URI = "reagentkits"
+    _TAG = "reagent-kit"
+    _PREFIX = 'kit'
 
-    name = StringDescriptor('name')
+    name     = StringDescriptor('name')
     supplier = StringDescriptor('supplier')
-    website = StringDescriptor('website')
+    website  = StringDescriptor('website')
     archived = BooleanDescriptor('archived')
 
 
 class ReagentLot(Entity):
     """Reagent Lots contain information about a particualr lot of reagent used in a step"""
-    _URI="reagentlot"
-    _TAG="reagent-lot"
+    _URI = "reagentlots"
+    _TAG = "reagent-lot"
+    _PREFIX = 'lot'
 
-    reagent_kit = EntityDescriptor('reagent-kit', ReagentKit)
-    name = StringDescriptor('name')
-    lot_number = StringDescriptor('lot-number')
-    created_date = StringDescriptor('created-date')
+    reagent_kit        = EntityDescriptor('reagent-kit', ReagentKit)
+    name               = StringDescriptor('name')
+    lot_number         = StringDescriptor('lot-number')
+    created_date       = StringDescriptor('created-date')
     last_modified_date = StringDescriptor('last-modified-date')
-    expiry_date = StringDescriptor('expiry-date')
-    created_by = EntityDescriptor('created-by', Researcher)
-    last_modified_by = EntityDescriptor('last-modified-by', Researcher)
-    status = StringDescriptor('status')
-    usage_count = IntegerDescriptor('usage-count')
+    expiry_date        = StringDescriptor('expiry-date')
+    created_by         = EntityDescriptor('created-by', Researcher)
+    last_modified_by   = EntityDescriptor('last-modified-by', Researcher)
+    status             = StringDescriptor('status')
+    usage_count        = IntegerDescriptor('usage-count')
 
 
 class StepReagentLots(Entity):
@@ -1294,12 +819,14 @@ class Step(Entity):
     "Step, as defined by the genologics API."
 
     _URI = 'steps'
+    _PREFIX = 'stp'
 
-    _reagent_lots       = EntityDescriptor('reagent-lots', StepReagentLots)
-    actions             = EntityDescriptor('actions', StepActions)
-    placements          = EntityDescriptor('placements', StepPlacements)
-    #program_status     = EntityDescriptor('program-status',StepProgramStatus)
-    #details            = EntityListDescriptor(nsmap('file:file'), StepDetails)
+    _reagent_lots = EntityDescriptor('reagent-lots', StepReagentLots)
+    actions       = EntityDescriptor('actions', StepActions)
+    placements    = EntityDescriptor('placements', StepPlacements)
+
+    # program_status     = EntityDescriptor('program-status',StepProgramStatus)
+    # details            = EntityListDescriptor(nsmap('file:file'), StepDetails)
 
     @property
     def reagent_lots(self):
@@ -1309,7 +836,7 @@ class Step(Entity):
 class ProtocolStep(Entity):
     """Steps key in the Protocol object"""
 
-    _TAG='step'
+    _TAG = 'step'
 
     name                = StringAttributeDescriptor("name")
     type                = EntityDescriptor('type', Processtype)
@@ -1323,11 +850,11 @@ class ProtocolStep(Entity):
 
 class Protocol(Entity):
     """Protocol, holding ProtocolSteps and protocol-properties"""
-    _URI='configuration/protocols'
-    _TAG='protocol'
+    _URI = 'configuration/protocols'
+    _TAG = 'protocol'
 
-    steps       = NestedEntityListDescriptor('step', ProtocolStep, 'steps')
-    properties  = NestedAttributeListDescriptor('protocol-property', 'protocol-properties')
+    steps      = NestedEntityListDescriptor('step', ProtocolStep, 'steps')
+    properties = NestedAttributeListDescriptor('protocol-property', 'protocol-properties')
 
 
 class Stage(Entity):
@@ -1340,8 +867,8 @@ class Stage(Entity):
 
 class Workflow(Entity):
     """ Workflow, introduced in 3.5"""
-    _URI="configuration/workflows"
-    _TAG="workflow"
+    _URI = "configuration/workflows"
+    _TAG = "workflow"
 
     name      = StringAttributeDescriptor("name")
     status    = StringAttributeDescriptor("status")
@@ -1351,26 +878,26 @@ class Workflow(Entity):
 
 class ReagentType(Entity):
     """Reagent Type, usually, indexes for sequencing"""
-    _URI="reagenttypes"
-    _TAG="reagent-type"
+    _URI = "reagenttypes"
+    _TAG = "reagent-type"
+    _PREFIX = 'rtp'
 
-    category=StringDescriptor('reagent-category')
+    category = StringDescriptor('reagent-category')
 
     def __init__(self, lims, uri=None, id=None):
-        super(ReagentType, self).__init__(lims,uri,id)
+        super(ReagentType, self).__init__(lims, uri, id)
         assert self.uri is not None
-        self.root=lims.get(self.uri)
-        self.sequence=None
+        self.root = lims.get(self.uri)
+        self.sequence = None
         for t in self.root.findall('special-type'):
             if t.attrib.get("name") == "Index":
                 for child in t.findall("attribute"):
                     if child.attrib.get("name") == "Sequence":
-                        self.sequence=child.attrib.get("value")
+                        self.sequence = child.attrib.get("value")
 
 
 Sample.artifact          = EntityDescriptor('artifact', Artifact)
 StepActions.step         = EntityDescriptor('step', Step)
-Stage.workflow            = EntityDescriptor('workflow', Workflow)
+Stage.workflow           = EntityDescriptor('workflow', Workflow)
 Artifact.workflow_stages = NestedEntityListDescriptor('workflow-stage', Stage, 'workflow-stages')
-Step.configuration      = EntityDescriptor('configuration', ProtocolStep)
-
+Step.configuration       = EntityDescriptor('configuration', ProtocolStep)
