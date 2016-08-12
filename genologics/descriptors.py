@@ -277,7 +277,7 @@ class UdfDictionary(object):
                                           name=key)
             if not isinstance(value, str):
                 if not self._is_string(value):
-                    value = str(value).encode('UTF-8')
+                    value = str(value)
 
             elem.text = value
 

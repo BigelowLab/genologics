@@ -12,7 +12,10 @@ version = subprocess.Popen(["git", "describe", "--abbrev=0"],stdout=subprocess.P
 if not version:
     version = __version__
 else:
-    version = version.decode("utf-8")
+    try:   
+        version = version.decode("utf-8")
+    except:
+        version = version
 
 try:
     with open("requirements.txt") as rq:
@@ -26,16 +29,16 @@ setup(name='genologics',
       long_description="""A basic module for interacting with the GenoLogics LIMS server via its REST API.
                           The goal is to provide simple access to the most common entities and their attributes in a reasonably Pythonic fashion.""",
       classifiers=[
-	"Development Status :: 4 - Beta",
-	"Environment :: Console",
-	"Intended Audience :: Developers",
-	"Intended Audience :: Healthcare Industry",
-	"Intended Audience :: Science/Research",
-	"License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
-	"Operating System :: POSIX :: Linux",
-	"Programming Language :: Python",
-	"Topic :: Scientific/Engineering :: Medical Science Apps."
-	],
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Healthcare Industry",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python",
+    "Topic :: Scientific/Engineering :: Medical Science Apps."
+    ],
       keywords='genologics api rest',
       author='Per Kraulis',
       author_email='per.kraulis@scilifelab.se',
