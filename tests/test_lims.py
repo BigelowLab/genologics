@@ -27,6 +27,9 @@ class TestLims(TestCase):
 <exc:exception xmlns:exc="http://genologics.com/ri/exception">
     <message>Generic error message</message>
 </exc:exception>"""
+    error_no_msg_xml = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<exc:exception xmlns:exc="http://genologics.com/ri/exception">
+</exc:exception>"""
 
 
     def test_get_uri(self):
@@ -41,6 +44,9 @@ class TestLims(TestCase):
         assert isinstance(pr, xml.etree.ElementTree.Element)
 
         r = Mock(content = self.error_xml, status_code=400)
+        self.assertRaises(HTTPError, lims.parse_response, r)
+
+        r = Mock(content = self.error_no_msg_xml, status_code=400)
         self.assertRaises(HTTPError, lims.parse_response, r)
 
 

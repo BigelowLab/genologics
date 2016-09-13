@@ -58,6 +58,7 @@ class StringDescriptor(TagDescriptor):
             return node.text
 
     def __set__(self, instance, value):
+        instance.get()
         node = self.get_node(instance)
         if node is None:
             # create the new tag
@@ -74,6 +75,10 @@ class StringAttributeDescriptor(TagDescriptor):
     def __get__(self, instance, cls):
         instance.get()
         return instance.root.attrib[self.tag]
+
+    def __set__(self, instance, value):
+        instance.get()
+        instance.root.attrib[self.tag] = value
 
 
 class StringListDescriptor(TagDescriptor):
@@ -237,7 +242,7 @@ class UdfDictionary(object):
             elif vtype == 'boolean':
                 if not isinstance(value, bool):
                     raise TypeError('Boolean UDF requires bool value')
-                value = value and 'True' or 'False'
+                value = value and 'true' or 'false'
             elif vtype == 'date':
                 if not isinstance(value, datetime.date):  # Too restrictive?
                     raise TypeError('Date UDF requires datetime.date value')
@@ -258,9 +263,10 @@ class UdfDictionary(object):
                 vtype = '\n' in value and 'Text' or 'String'
             elif isinstance(value, bool):
                 vtype = 'Boolean'
-                value = value and 'True' or 'False'
+                value = value and 'true' or 'false'
             elif isinstance(value, (int, float)):
                 vtype = 'Numeric'
+                value = str(value)
             elif isinstance(value, datetime.date):
                 vtype = 'Date'
                 value = str(value)
@@ -280,6 +286,10 @@ class UdfDictionary(object):
                     value = str(value)
 
             elem.text = value
+
+            #update the internal elements and lookup with new values
+            self._update_elems()
+            self._prepare_lookup()
 
     def __delitem__(self, key):
         del self._lookup[key]
@@ -375,6 +385,7 @@ class EntityDescriptor(TagDescriptor):
             return self.klass(instance.lims, uri=node.attrib['uri'])
 
     def __set__(self, instance, value):
+        instance.get()
         node = self.get_node(instance)
         if node is None:
             # create the new tag

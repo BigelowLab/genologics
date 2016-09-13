@@ -142,6 +142,17 @@ class TestStringAttributeDescriptor(TestDescriptor):
         sd = self._make_desc(StringAttributeDescriptor, 'name')
         assert sd.__get__(self.instance, None) == "test name"
 
+    def test__set__(self):
+        sd = self._make_desc(StringAttributeDescriptor, 'name')
+        sd.__set__(self.instance, "test name2")
+        assert self.et.attrib['name'] == "test name2"
+
+    def test_create(self):
+        instance_new = Mock(root=ElementTree.Element('test-entry'))
+        bd = self._make_desc(StringAttributeDescriptor, 'name')
+        bd.__set__(instance_new, "test name2")
+        assert instance_new.root.attrib['name'] == "test name2"
+
 
 class TestStringListDescriptor(TestDescriptor):
     def setUp(self):
@@ -182,6 +193,7 @@ class TestUdfDictionary(TestCase):
 <test-entry xmlns:udf="http://genologics.com/ri/userdefined">
 <udf:field type="String" name="test">stuff</udf:field>
 <udf:field type="Numeric" name="how much">42</udf:field>
+<udf:field type="Boolean" name="really?">true</udf:field>
 </test-entry>""")
         self.instance = Mock(root=self.et)
         self.dict1 = UdfDictionary(self.instance)
@@ -221,11 +233,27 @@ class TestUdfDictionary(TestCase):
         self.dict1.__setitem__('how much', 21)
         assert self._get_udf_value(self.dict1, 'how much') == '21'
 
+        assert self._get_udf_value(self.dict1, 'really?') == 'true'
+        self.dict1.__setitem__('really?', False)
+        assert self._get_udf_value(self.dict1, 'really?') == 'false'
+
         self.assertRaises(TypeError, self.dict1.__setitem__, 'how much', '433')
 
-        # I'm not sure if this is the expected behaviour
+        # FIXME: I'm not sure if this is the expected behaviour
         self.dict1.__setitem__('how much', None)
         assert self._get_udf_value(self.dict1, 'how much') == b'None'
+
+
+    def test___setitem__new(self):
+        self.dict1.__setitem__('new string', 'new stuff')
+        assert self._get_udf_value(self.dict1, 'new string') == 'new stuff'
+
+        self.dict1.__setitem__('new numeric', 21)
+        assert self._get_udf_value(self.dict1, 'new numeric') == '21'
+
+        self.dict1.__setitem__('new bool', False)
+        assert self._get_udf_value(self.dict1, 'new bool') == 'false'
+
 
     def test___setitem__unicode(self):
         assert self._get_udf_value(self.dict1, 'test') == 'stuff'

@@ -165,7 +165,9 @@ class Lims(object):
                 node = root.find('message')
                 if node is None:
                     response.raise_for_status()
-                message = "%s: %s" % (response.status_code, node.text)
+                    message = "%s" % (response.status_code)
+                else:
+                    message = "%s: %s" % (response.status_code, node.text)
                 node = root.find('suggested-actions')
                 if node is not None:
                     message += ' ' + node.text
@@ -394,14 +396,23 @@ class Lims(object):
         params.update(self._get_params_udf(udf=udf, udtname=udtname, udt=udt))
         return self._get_instances(Process, params=params)
 
-    def get_workflows(self):
+    def get_workflows(self, name=None):
         """Get the list of existing workflows on the system """
-        params = self._get_params()
+        params = self._get_params(name=name)
         return self._get_instances(Workflow, params=params)
 
-    def get_protocols(self):
+    def get_process_types(self, displayname=None):
+        """Get a list of process types with the specified name."""
+        params = self._get_params(displayname=displayname)
+        return self._get_instances(Processtype, params=params)
+
+    def get_reagent_types(self, name=None):
+        params = self._get_params(name=name)
+        return self._get_instances(ReagentType, params=params)
+
+    def get_protocols(self, name=None):
         """Get the list of existing protocols on the system """
-        params = self._get_params()
+        params = self._get_params(name=name)
         return self._get_instances(Protocol, params=params)
 
     def get_reagent_kits(self, name=None, start_index=None):
