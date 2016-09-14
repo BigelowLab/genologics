@@ -736,6 +736,41 @@ class StepPlacements(Entity):
     selected_containers = property(get_selected_containers)
 
 
+class StepReagents(Entity):
+    """Reagents from within a step. Supports POST"""
+    _reagentlist = None
+
+    # [[A,R],[A,R]] where A is an Artifact and R is reagent string
+    def get_reagent_list(self):
+        if not self._reagentlist:
+            # Only fetch the data once.
+            self.get()
+            self._reagentlist = []
+            for node in self.root.find('output-reagents').findall('output'):
+                input = Artifact(self.lims, uri=node.attrib['uri'])
+                location = (None, None)
+                if node.find('reagent-label') is not None:
+                    reagent = node.find('reagent-label').attrib['name']
+                self._reagentlist.append([input, reagent])
+        return self._reagentlist
+
+    
+    def set_reagent_list(self, value):
+        self.get_reagent_list()
+        for node in self.root.find('output-reagents').findall('output'):
+            for pair in value:
+                if pair[0].uri == node.attrib['uri']:
+                    if node.find('reagent-label') is not None:
+                        value_el = node.find('reagent-label')
+                    else:
+                        value_el = ElementTree.SubElement(node, 'reagent-label')
+                    value_el.attrib['name'] = pair[1]
+        self._reagentlist = value
+        return self._reagentlist
+        
+    reagent_list = property(get_reagent_list, set_reagent_list)
+
+
 class StepActions(Entity):
     """Actions associated with a step"""
     _escalation = None
@@ -824,6 +859,7 @@ class Step(Entity):
     _reagent_lots = EntityDescriptor('reagent-lots', StepReagentLots)
     actions       = EntityDescriptor('actions', StepActions)
     placements    = EntityDescriptor('placements', StepPlacements)
+    reagents      = EntityDescriptor('reagents', StepReagents)
 
     # program_status     = EntityDescriptor('program-status',StepProgramStatus)
     # details            = EntityListDescriptor(nsmap('file:file'), StepDetails)
