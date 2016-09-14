@@ -740,6 +740,8 @@ class StepReagents(Entity):
     """Reagents from within a step. Supports POST"""
     _reagentlist = None
 
+    reagent_category = StringDescriptor('reagent-category')
+    
     # [[A,R],[A,R]] where A is an Artifact and R is reagent string
     def get_reagent_list(self):
         if not self._reagentlist:
