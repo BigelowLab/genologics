@@ -773,6 +773,59 @@ class StepReagents(Entity):
     reagent_list = property(get_reagent_list, set_reagent_list)
 
 
+class StepPools(Entity):
+    """Pool samples from within a step. Supports POST"""
+    _available_inputs = None
+    _pooled_inputs = None
+    _pool_artifacts = None
+    
+    def get_available_inputs(self):
+        if not self._available_inputs:
+            # Only fetch the data once.
+            self.get()
+            self._available_inputs = []
+            for node in self.root.find('available-inputs').findall('input'):
+                input = Artifact(self.lims, uri=node.attrib['uri'])
+                self._available_inputs.append(input)
+        return self._available_inputs
+
+    # returns {pool_name : [input artifacts]}
+    def get_pooled_inputs(self):
+        if not self._pooled_inputs:
+            # Only fetch the data once.
+            self.get()
+            self._pooled_inputs = {}
+            for node in self.root.find('pooled-inputs').findall('pool'):
+                pooled_arts = []
+                pool_name = Artifact(lims, uri = node.attrib['output-uri']).name
+                for child in node.findall('input'):
+                    art = Artifact(lims, uri = child.attrib['uri'])
+                    pooled_arts.append(art)
+                self._pooled_inputs[pool_art] = pooled_arts
+        return self._pooled_inputs
+    
+    def set_pooled_inputs(self, value):
+        parent = self.root.find('pooled-inputs')
+        for pool in value.keys():
+            pool_node = ElementTree.SubElement(parent, 'pool')
+            pool_node.attrib['name'] = pool
+            
+            for a in value[pool]:
+                in_art = ElementTree.SubElement(pool_node, 'input')
+                in_art.attrib['uri'] = a.uri
+        self._pooled_inputs = value
+    
+    def get_pools(self):
+        if not self._pool_artifacts:
+            self.get()
+            self._pool_artifacts = []
+            for node in self.root.find('pooled-inputs').findall('pool'):
+                self._pool_artifacts.append(Artifact(lims, uri = node.attrib['output-uri']))
+        return self._pool_artifacts        
+    
+    pooled_inputs = property(get_pooled_inputs, set_pooled_inputs)
+
+
 class StepActions(Entity):
     """Actions associated with a step"""
     _escalation = None
@@ -862,6 +915,7 @@ class Step(Entity):
     actions       = EntityDescriptor('actions', StepActions)
     placements    = EntityDescriptor('placements', StepPlacements)
     reagents      = EntityDescriptor('reagents', StepReagents)
+    pools         = EntityDescriptor('pools', StepPools)
 
     # program_status     = EntityDescriptor('program-status',StepProgramStatus)
     # details            = EntityListDescriptor(nsmap('file:file'), StepDetails)
@@ -869,6 +923,12 @@ class Step(Entity):
     @property
     def reagent_lots(self):
         return self._reagent_lots.reagent_lots
+
+    def advance(self):
+        advance_uri = "/".join([self.uri, "advance"])
+        self.get()
+        data = tostring(self.root)
+        return self.lims.post(advance_uri, data)
 
 
 class ProtocolStep(Entity):
