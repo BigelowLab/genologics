@@ -18,7 +18,7 @@ try:
 except ImportError:
     from urlparse import urlsplit, urlparse, parse_qs, urlunparse
 
-from xml.etree import ElementTree, tostring
+from xml.etree import ElementTree
 
 import logging
 
@@ -920,7 +920,7 @@ class Step(Entity):
     def advance(self):
         advance_uri = "/".join([self.uri, "advance"])
         self.get()
-        data = tostring(self.root)
+        data = self.lims.tostring(self.root)
         return self.lims.post(advance_uri, data)
 
 
