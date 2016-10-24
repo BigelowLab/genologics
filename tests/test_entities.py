@@ -6,7 +6,7 @@ from genologics.entities import StepActions, Researcher, Artifact, \
     Step, StepPlacements, Container, Stage, ReagentKit, ReagentLot
 from genologics.lims import Lims
 
-if version_info.major == 2:
+if version_info[0] == 2:
     from mock import patch, Mock
 else:
     from unittest.mock import patch, Mock
@@ -158,18 +158,18 @@ class TestStepActions(TestEntities):
 
     def test_escalation(self):
         s = StepActions(uri=self.lims.get_uri('steps', 'step_id', 'actions'), lims=self.lims)
-        with patch('requests.Session.get', return_value=Mock(content=self.step_actions_xml, status_code=200)), \
-             patch('requests.post', return_value=Mock(content=self.dummy_xml, status_code=200)):
-            r = Researcher(uri='http://testgenologics.com:4040/researchers/r1', lims=self.lims)
-            a = Artifact(uri='http://testgenologics.com:4040/artifacts/r1', lims=self.lims)
-            expected_escalation = {
-                'status': 'Reviewed',
-                'author': r,
-                'artifacts': [a], 'request': 'no comments',
-                'answer': 'no comments',
-                'reviewer': r}
+        with patch('requests.Session.get', return_value=Mock(content=self.step_actions_xml, status_code=200)):
+            with patch('requests.post', return_value=Mock(content=self.dummy_xml, status_code=200)):
+                r = Researcher(uri='http://testgenologics.com:4040/researchers/r1', lims=self.lims)
+                a = Artifact(uri='http://testgenologics.com:4040/artifacts/r1', lims=self.lims)
+                expected_escalation = {
+                    'status': 'Reviewed',
+                    'author': r,
+                    'artifacts': [a], 'request': 'no comments',
+                    'answer': 'no comments',
+                    'reviewer': r}
 
-            assert s.escalation == expected_escalation
+                assert s.escalation == expected_escalation
 
     def test_next_actions(self):
         s = StepActions(uri=self.lims.get_uri('steps', 'step_id', 'actions'), lims=self.lims)

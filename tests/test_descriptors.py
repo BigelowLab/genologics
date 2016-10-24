@@ -8,7 +8,7 @@ from genologics.descriptors import StringDescriptor, StringAttributeDescriptor, 
 from genologics.entities import Artifact
 from genologics.lims import Lims
 
-if version_info.major == 2:
+if version_info[0] == 2:
     from mock import Mock
 else:
     from unittest.mock import Mock
@@ -183,7 +183,7 @@ class TestStringDictionaryDescriptor(TestDescriptor):
         sd = self._make_desc(StringDictionaryDescriptor, 'test-subentry')
         res = sd.__get__(self.instance, None)
         assert type(res) == dict
-        self.assertIsNone(res['test-firstkey'])
+        assert res['test-firstkey'] is None
         assert res['test-secondkey'] == 'second value'
 
 

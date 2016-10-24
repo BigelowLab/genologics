@@ -4,10 +4,15 @@ from unittest import TestCase
 from requests.exceptions import HTTPError
 
 from genologics.lims import Lims
+try:
+    callable(1)
+except NameError: # callable() doesn't exist in Python 3.0 and 3.1
+    import collections
+    callable = lambda obj: isinstance(obj, collections.Callable)
 
 
 from sys import version_info
-if version_info.major == 2:
+if version_info[0] == 2:
     from mock import patch, Mock
     import __builtin__ as builtins
 else:
@@ -41,7 +46,9 @@ class TestLims(TestCase):
         lims = Lims(self.url, username=self.username, password=self.password)
         r = Mock(content = self.sample_xml, status_code=200)
         pr = lims.parse_response(r)
-        assert isinstance(pr, xml.etree.ElementTree.Element)
+        assert pr is not None
+        assert callable(pr.find)
+        assert hasattr(pr.attrib, '__getitem__')
 
         r = Mock(content = self.error_xml, status_code=400)
         self.assertRaises(HTTPError, lims.parse_response, r)
@@ -54,7 +61,9 @@ class TestLims(TestCase):
     def test_get(self, mocked_instance):
         lims = Lims(self.url, username=self.username, password=self.password)
         r = lims.get('{url}/api/v2/artifacts?sample_name=test_sample'.format(url=self.url))
-        assert isinstance(r, xml.etree.ElementTree.Element)
+        assert r is not None
+        assert callable(r.find)
+        assert hasattr(r.attrib, '__getitem__')
         assert mocked_instance.call_count == 1
         mocked_instance.assert_called_with('http://testgenologics.com:4040/api/v2/artifacts?sample_name=test_sample', timeout=16,
                                   headers={'accept': 'application/xml'}, params={}, auth=('test', 'password'))
