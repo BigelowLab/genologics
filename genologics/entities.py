@@ -815,14 +815,6 @@ class StepPools(Entity):
                 in_art.attrib['uri'] = a.uri
         self._pooled_inputs = value
     
-    def get_pools(self):
-        if not self._pool_artifacts:
-            self.get()
-            self._pool_artifacts = []
-            for node in self.root.find('pooled-inputs').findall('pool'):
-                self._pool_artifacts.append(Artifact(lims, uri = node.attrib['output-uri']))
-        return self._pool_artifacts        
-    
     pooled_inputs = property(get_pooled_inputs, set_pooled_inputs)
 
 
