@@ -18,7 +18,7 @@ try:
 except ImportError:
     from urlparse import urlsplit, urlparse, parse_qs, urlunparse
 
-from xml.etree import ElementTree
+from xml.etree import ElementTree, tostring
 
 import logging
 
