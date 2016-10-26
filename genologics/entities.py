@@ -920,7 +920,7 @@ class Step(Entity):
     def advance(self):
         advance_uri = "/".join([self.uri, "advance"])
         self.get()
-        data = self.lims.tostring(self.root)
+        data = self.lims.tostring(ElementTree.ElementTree(self.root))
         return self.lims.post(advance_uri, data)
 
 
