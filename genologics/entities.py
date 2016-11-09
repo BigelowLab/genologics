@@ -954,6 +954,7 @@ class ProtocolStep(Entity):
     sample_fields       = NestedAttributeListDescriptor('sample-field', 'sample-fields')
     step_properties     = NestedAttributeListDescriptor('step_property', 'step_properties')
     epp_triggers        = NestedAttributeListDescriptor('epp_trigger', 'epp_triggers')
+    transitions         = NestedAttributeListDescriptor('transition', 'transitions')
 
 
 class Protocol(Entity):
