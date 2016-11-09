@@ -863,6 +863,23 @@ class StepActions(Entity):
                 actions.append(action)
         return actions
 
+    def assign_next_actions(self, actionlist):
+        ''' 
+        Args: actionlist in the form of a list of dicts with 
+            format: {'artifact': Artifact, 'step':Step, 'action':action}; 
+            same as the output for StepActions.next_actions
+        '''
+        self.get()
+        if self.root.find('next-actions') is not None:
+            for node in self.root.find('next-actions').findall('next-action'):
+                art = Artifact(self.lims, node.attrib.get('artifact-uri'))
+                adict = [i for i in actionlist if i['artifact'] == art][0]
+                node.attrib['action'] = adict['action']
+                node.attrib['step-uri'] = adict['step'].uri
+        return actionlist
+
+    next_action_list = property(next_actions, assign_next_actions)
+
 
 class ReagentKit(Entity):
     """Type of Reagent with information about the provider"""
