@@ -83,7 +83,7 @@ class SampleHistory:
                     for samp in input_art.samples:
                         if samp.name == self.sample_name:
                             samp_art_map[one_art.id] = (one_art.parent_process, input_art.id)
-                            
+
         self.art_map = samp_art_map
 
     def alternate_history(self, out_art, in_art=None):
@@ -290,7 +290,7 @@ class Entity(object):
         "Save this instance by doing PUT of its serialized XML."
         data = self.lims.tostring(ElementTree.ElementTree(self.root))
         self.lims.put(self.uri, data)
-    
+
     def info(self):
         "print uri and id for entity"
         print("uri: %s" % self.uri)
@@ -474,9 +474,9 @@ class Udfconfig(Entity):
     first_preset_is_default_value = BooleanDescriptor('first-preset-is-default-value')
     show_in_tables                = BooleanDescriptor('show-in-tables')
     is_editable                   = BooleanDescriptor('is-editable')
-    is_deviation                  = BooleanDescriptor('is-deviation') 
+    is_deviation                  = BooleanDescriptor('is-deviation')
     is_controlled_vocabulary      = BooleanDescriptor('is-controlled-vocabulary')
-    presets                       = StringListDescriptor('preset') 
+    presets                       = StringListDescriptor('preset')
 
 
 
@@ -563,8 +563,8 @@ class Process(Entity):
         return [a for a in artifacts if a.output_type == 'ResultFile']
 
     def analytes(self):
-        """Retreving the output Analytes of the process, if existing. 
-        If the process is not producing any output analytes, the input 
+        """Retreving the output Analytes of the process, if existing.
+        If the process is not producing any output analytes, the input
         analytes are returned. Input/Output is returned as a information string.
         Makes aggregate processes and normal processes look the same."""
         info = 'Output'
@@ -742,7 +742,7 @@ class StepReagents(Entity):
     _reagentlist = None
 
     reagent_category = StringDescriptor('reagent-category')
-    
+
     # [[A,R],[A,R]] where A is an Artifact and R is reagent string
     def get_reagent_list(self):
         if not self._reagentlist:
@@ -750,6 +750,7 @@ class StepReagents(Entity):
             self.get()
             self._reagentlist = []
             for node in self.root.find('output-reagents').findall('output'):
+                reagent = None
                 input = Artifact(self.lims, uri=node.attrib['uri'])
                 location = (None, None)
                 if node.find('reagent-label') is not None:
@@ -757,7 +758,7 @@ class StepReagents(Entity):
                 self._reagentlist.append([input, reagent])
         return self._reagentlist
 
-    
+
     def set_reagent_list(self, value):
         self.get_reagent_list()
         for node in self.root.find('output-reagents').findall('output'):
@@ -770,7 +771,7 @@ class StepReagents(Entity):
                     value_el.attrib['name'] = pair[1]
         self._reagentlist = value
         return self._reagentlist
-        
+
     reagent_list = property(get_reagent_list, set_reagent_list)
 
 
@@ -779,7 +780,7 @@ class StepPools(Entity):
     _available_inputs = None
     _pooled_inputs = None
     _pool_artifacts = None
-    
+
     def get_available_inputs(self):
         if not self._available_inputs:
             # Only fetch the data once.
@@ -804,18 +805,18 @@ class StepPools(Entity):
                     pooled_arts.append(art)
                 self._pooled_inputs[pool_art] = pooled_arts
         return self._pooled_inputs
-    
+
     def set_pooled_inputs(self, value):
         parent = self.root.find('pooled-inputs')
         for pool in value.keys():
             pool_node = ElementTree.SubElement(parent, 'pool')
             pool_node.attrib['name'] = pool
-            
+
             for a in value[pool]:
                 in_art = ElementTree.SubElement(pool_node, 'input')
                 in_art.attrib['uri'] = a.uri
         self._pooled_inputs = value
-    
+
     pooled_inputs = property(get_pooled_inputs, set_pooled_inputs)
 
 
@@ -864,9 +865,9 @@ class StepActions(Entity):
         return actions
 
     def assign_next_actions(self, actionlist):
-        ''' 
-        Args: actionlist in the form of a list of dicts with 
-            format: {'artifact': Artifact, 'step':Step, 'action':action}; 
+        '''
+        Args: actionlist in the form of a list of dicts with
+            format: {'artifact': Artifact, 'step':Step, 'action':action};
             same as the output for StepActions.next_actions
         '''
         self.get()
@@ -998,6 +999,8 @@ class ReagentType(Entity):
         assert self.uri is not None
         self.root = lims.get(self.uri)
         self.sequence = None
+        # JMB ADDED:
+        self.name = self.root.attrib.get('name')
         for t in self.root.findall('special-type'):
             if t.attrib.get("name") == "Index":
                 for child in t.findall("attribute"):
@@ -1017,4 +1020,3 @@ StepActions.step         = EntityDescriptor('step', Step)
 Stage.workflow           = EntityDescriptor('workflow', Workflow)
 Artifact.workflow_stages = NestedEntityListDescriptor('workflow-stage', Stage, 'workflow-stages')
 Step.configuration       = EntityDescriptor('configuration', ProtocolStep)
-
