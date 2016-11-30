@@ -36,7 +36,7 @@ if version_info[:2] < (2,7):
     ElementTree.ParseError = expat.ExpatError
     p26_write = ElementTree.ElementTree.write
     def write_with_xml_declaration(self, file, encoding, xml_declaration):
-        assert xml_declaration is True # Support our use case only 
+        assert xml_declaration is True # Support our use case only
         file.write("<?xml version='1.0' encoding='utf-8'?>\n")
         p26_write(self, file, encoding=encoding)
     ElementTree.ElementTree.write = write_with_xml_declaration
@@ -55,7 +55,7 @@ class Lims(object):
                     For example: https://genologics.scilifelab.se:8443/
         username: The account name of the user to login as.
         password: The password for the user account to login as.
-        version: The optional LIMS API version, by default 'v2' 
+        version: The optional LIMS API version, by default 'v2'
         """
         self.baseuri = baseuri.rstrip('/') + '/'
         self.username = username
@@ -200,7 +200,7 @@ class Lims(object):
     def get_udfs(self, name=None, attach_to_name=None, attach_to_category=None, start_index=None):
         """Get a list of udfs, filtered by keyword arguments.
         name: name of udf
-        attach_to_name: item in the system, to wich the udf is attached, such as 
+        attach_to_name: item in the system, to wich the udf is attached, such as
             Sample, Project, Container, or the name of a process.
         attach_to_category: If 'attach_to_name' is the name of a process, such as 'CaliperGX QC (DNA)',
              then you need to set attach_to_category='ProcessType'. Must not be provided otherwise.
@@ -413,6 +413,10 @@ class Lims(object):
         """Get the list of existing workflows on the system """
         params = self._get_params(name=name)
         return self._get_instances(Workflow, params=params)
+
+    def get_container_types(self, displayname=None):
+        params = self._get_params(displayname=displayname)
+        return self._get_instances(Containertype, params=params)
 
     def get_process_types(self, displayname=None):
         """Get a list of process types with the specified name."""

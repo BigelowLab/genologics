@@ -950,6 +950,7 @@ class ProtocolStep(Entity):
     name                = StringAttributeDescriptor("name")
     type                = EntityDescriptor('type', Processtype)
     permittedcontainers = NestedStringListDescriptor('container-type', 'container-types')
+    permittedreagents   = NestedStringListDescriptor('reagent-category', 'permitted-reagent-categories')
     queue_fields        = NestedAttributeListDescriptor('queue-field', 'queue-fields')
     step_fields         = NestedAttributeListDescriptor('step-field', 'step-fields')
     sample_fields       = NestedAttributeListDescriptor('sample-field', 'sample-fields')
@@ -963,6 +964,7 @@ class Protocol(Entity):
     _URI = 'configuration/protocols'
     _TAG = 'protocol'
 
+    name       = StringAttributeDescriptor('name')
     steps      = NestedEntityListDescriptor('step', ProtocolStep, 'steps')
     properties = NestedAttributeListDescriptor('protocol-property', 'protocol-properties')
 
@@ -1014,6 +1016,9 @@ class Queue(Entity):
     _PREFIX = "que"
 
     artifacts=NestedEntityListDescriptor("artifact", Artifact, "artifacts")
+
+    def create_step(self):
+
 
 Sample.artifact          = EntityDescriptor('artifact', Artifact)
 StepActions.step         = EntityDescriptor('step', Step)
