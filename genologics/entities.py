@@ -939,7 +939,9 @@ class Step(Entity):
         advance_uri = "/".join([self.uri, "advance"])
         self.get()
         data = self.lims.tostring(ElementTree.ElementTree(self.root))
-        return self.lims.post(advance_uri, data)
+        self.lims.post(advance_uri, data).attrib['uri']
+        self.lims.cache.clear()
+        return Step(self.lims, self.uri)
 
 
 class ProtocolStep(Entity):
@@ -1016,9 +1018,6 @@ class Queue(Entity):
     _PREFIX = "que"
 
     artifacts=NestedEntityListDescriptor("artifact", Artifact, "artifacts")
-
-    def create_step(self):
-
 
 Sample.artifact          = EntityDescriptor('artifact', Artifact)
 StepActions.step         = EntityDescriptor('step', Step)
