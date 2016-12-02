@@ -927,6 +927,7 @@ class Step(Entity):
     placements    = EntityDescriptor('placements', StepPlacements)
     reagents      = EntityDescriptor('reagents', StepReagents)
     pools         = EntityDescriptor('pools', StepPools)
+    state         = StringAttributeDescriptor("current-state")
 
     # program_status     = EntityDescriptor('program-status',StepProgramStatus)
     # details            = EntityListDescriptor(nsmap('file:file'), StepDetails)
