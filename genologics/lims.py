@@ -197,7 +197,7 @@ class Lims(object):
         root = ElementTree.fromstring(response.content)
         return root
 
-    def get_udfs(self, name=None, attach_to_name=None, attach_to_category=None, start_index=None):
+    def get_udfs(self, name=None, attach_to_name=None, attach_to_category=None, start_index=None, add_info=False):
         """Get a list of udfs, filtered by keyword arguments.
         name: name of udf
         attach_to_name: item in the system, to wich the udf is attached, such as
@@ -210,7 +210,7 @@ class Lims(object):
                                   attach_to_name=attach_to_name,
                                   attach_to_category=attach_to_category,
                                   start_index=start_index)
-        return self._get_instances(Udfconfig, params=params)
+        return self._get_instances(Udfconfig, add_info=add_info, params=params)
 
     def get_reagent_types(self, name=None, start_index=None):
         """Get a list of reqgent types, filtered by keyword arguments.
@@ -222,7 +222,7 @@ class Lims(object):
         return self._get_instances(ReagentType, params=params)
 
     def get_labs(self, name=None, last_modified=None,
-                 udf=dict(), udtname=None, udt=dict(), start_index=None):
+                 udf=dict(), udtname=None, udt=dict(), start_index=None, add_info=False):
         """Get a list of labs, filtered by keyword arguments.
         name: Lab name, or list of names.
         last_modified: Since the given ISO format datetime.
@@ -236,11 +236,12 @@ class Lims(object):
                                   last_modified=last_modified,
                                   start_index=start_index)
         params.update(self._get_params_udf(udf=udf, udtname=udtname, udt=udt))
-        return self._get_instances(Lab, params=params)
+        return self._get_instances(Lab, add_info=add_info, params=params)
 
     def get_researchers(self, firstname=None, lastname=None, username=None,
                         last_modified=None,
-                        udf=dict(), udtname=None, udt=dict(), start_index=None):
+                        udf=dict(), udtname=None, udt=dict(), start_index=None,
+                        add_info=False):
         """Get a list of researchers, filtered by keyword arguments.
         firstname: Researcher first name, or list of names.
         lastname: Researcher last name, or list of names.
@@ -258,10 +259,11 @@ class Lims(object):
                                   last_modified=last_modified,
                                   start_index=start_index)
         params.update(self._get_params_udf(udf=udf, udtname=udtname, udt=udt))
-        return self._get_instances(Researcher, params=params)
+        return self._get_instances(Researcher, add_info=add_info, params=params)
 
     def get_projects(self, name=None, open_date=None, last_modified=None,
-                     udf=dict(), udtname=None, udt=dict(), start_index=None):
+                     udf=dict(), udtname=None, udt=dict(), start_index=None,
+                     add_info=False):
         """Get a list of projects, filtered by keyword arguments.
         name: Project name, or list of names.
         open_date: Since the given ISO format date.
@@ -277,7 +279,7 @@ class Lims(object):
                                   last_modified=last_modified,
                                   start_index=start_index)
         params.update(self._get_params_udf(udf=udf, udtname=udtname, udt=udt))
-        return self._get_instances(Project, params=params)
+        return self._get_instances(Project, add_info=add_info, params=params)
 
     def get_sample_number(self, name=None, projectname=None, projectlimsid=None,
                           udf=dict(), udtname=None, udt=dict(), start_index=None):
@@ -362,7 +364,8 @@ class Lims(object):
 
     def get_containers(self, name=None, type=None,
                        state=None, last_modified=None,
-                       udf=dict(), udtname=None, udt=dict(), start_index=None):
+                       udf=dict(), udtname=None, udt=dict(), start_index=None,
+                       add_info=False):
         """Get a list of containers, filtered by keyword arguments.
         name: Containers name, or list of names.
         type: Container type, or list of types.
@@ -380,7 +383,7 @@ class Lims(object):
                                   last_modified=last_modified,
                                   start_index=start_index)
         params.update(self._get_params_udf(udf=udf, udtname=udtname, udt=udt))
-        return self._get_instances(Container, params=params)
+        return self._get_instances(Container, add_info=add_info, params=params)
 
     def get_processes(self, last_modified=None, type=None,
                       inputartifactlimsid=None,
@@ -409,37 +412,39 @@ class Lims(object):
         params.update(self._get_params_udf(udf=udf, udtname=udtname, udt=udt))
         return self._get_instances(Process, params=params)
 
-    def get_workflows(self, name=None):
+    def get_workflows(self, name=None, add_info=False):
         """Get the list of existing workflows on the system """
         params = self._get_params(name=name)
-        return self._get_instances(Workflow, params=params)
+        return self._get_instances(Workflow, add_info=add_info, params=params)
+
 
     def get_container_types(self, displayname=None):
         params = self._get_params(displayname=displayname)
         return self._get_instances(Containertype, params=params)
 
-    def get_process_types(self, displayname=None):
+
+    def get_process_types(self, displayname=None, add_info=False):
         """Get a list of process types with the specified name."""
         params = self._get_params(displayname=displayname)
-        return self._get_instances(Processtype, params=params)
+        return self._get_instances(Processtype, add_info=add_info, params=params)
 
-    def get_reagent_types(self, name=None):
+    def get_reagent_types(self, name=None, add_info=False):
         params = self._get_params(name=name)
-        return self._get_instances(ReagentType, params=params)
+        return self._get_instances(ReagentType, add_info=add_info, params=params)
 
-    def get_protocols(self, name=None):
+    def get_protocols(self, name=None, add_info=False):
         """Get the list of existing protocols on the system """
         params = self._get_params(name=name)
-        return self._get_instances(Protocol, params=params)
+        return self._get_instances(Protocol, add_info=add_info, params=params)
 
-    def get_reagent_kits(self, name=None, start_index=None):
+    def get_reagent_kits(self, name=None, start_index=None, add_info=False):
         """Get a list of reagent kits, filtered by keyword arguments.
         name: reagent kit  name, or list of names.
         start_index: Page to retrieve; all if None.
         """
         params = self._get_params(name=name,
                                   start_index=start_index)
-        return self._get_instances(ReagentKit, params=params)
+        return self._get_instances(ReagentKit, add_info=add_info, params=params)
 
     def get_reagent_lots(self, name=None, kitname=None, number=None,
                          start_index=None):
@@ -472,19 +477,29 @@ class Lims(object):
             result["udt.%s" % key] = value
         return result
 
-    def _get_instances(self, klass, params=dict()):
-        result = []
+    def _get_instances(self, klass, add_info=None, params=dict()):
+        results = []
+        additionnal_info_dicts = []
         tag = klass._TAG
         if tag is None:
             tag = klass.__name__.lower()
         root = self.get(self.get_uri(klass._URI), params=params)
         while params.get('start-index') is None:  # Loop over all pages.
             for node in root.findall(tag):
-                result.append(klass(self, uri=node.attrib['uri']))
+                results.append(klass(self, uri=node.attrib['uri']))
+                info_dict = {}
+                for attrib_key in node.attrib:
+                    info_dict[attrib_key] = node.attrib['uri']
+                for subnode in node:
+                    info_dict[subnode.tag] = subnode.text
+                additionnal_info_dicts.append(info_dict)
             node = root.find('next-page')
             if node is None: break
             root = self.get(node.attrib['uri'], params=params)
-        return result
+        if add_info:
+            return results, additionnal_info_dicts
+        else:
+            return results
 
     def get_batch(self, instances, force=False):
         """Get the content of a set of instances using the efficient batch call.
