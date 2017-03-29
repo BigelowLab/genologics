@@ -888,21 +888,12 @@ class StepActions(Entity):
                 actions.append(action)
         return actions
 
-
-    def set_next_actions(self, actionlist):
-        '''
-        Args: actionlist in the form of a list of dicts with
-            format: {'artifact': Artifact, 'step':Step, 'action':action};
-            same as the output for StepActions.next_actions
-        '''
-        self.get()
-        if self.root.find('next-actions') is not None:
-            for node in self.root.find('next-actions').findall('next-action'):
-                art = Artifact(self.lims, node.attrib.get('artifact-uri'))
-                adict = [i for i in actionlist if i['artifact'] == art][0]
-                node.attrib['action'] = adict['action']
-                node.attrib['step-uri'] = adict['step'].uri
-        return actionlist
+    def set_next_actions(self, actions):
+        for node in self.root.find('next-actions').findall('next-action'):
+            art_uri = node.attrib.get('artifact-uri')
+            action = [action for action in actions if action['artifact'].uri == art_uri][0]
+            if 'action' in action: node.attrib['action'] = action.get('action')
+        return actions
 
 
     next_actions = property(get_next_actions, set_next_actions)
@@ -976,14 +967,6 @@ class Step(Entity):
     @property
     def reagent_lots(self):
         return self._reagent_lots.reagent_lots
-
-    # def advance(self):
-    #     advance_uri = "/".join([self.uri, "advance"])
-    #    self.get()
-    #     data = self.lims.tostring(ElementTree.ElementTree(self.root))
-    #     self.lims.post(advance_uri, data).attrib['uri']
-    #     self.lims.cache.clear()
-    #     return Step(self.lims, self.uri)
 
 
 class ProtocolStep(Entity):
