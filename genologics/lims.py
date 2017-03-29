@@ -41,7 +41,7 @@ if version_info[:2] < (2,7):
         p26_write(self, file, encoding=encoding)
     ElementTree.ElementTree.write = write_with_xml_declaration
 
-TIMEOUT = 16
+TIMEOUT = 90
 
 
 class Lims(object):
@@ -417,11 +417,9 @@ class Lims(object):
         params = self._get_params(name=name)
         return self._get_instances(Workflow, add_info=add_info, params=params)
 
-
     def get_container_types(self, displayname=None):
         params = self._get_params(displayname=displayname)
         return self._get_instances(Containertype, params=params)
-
 
     def get_process_types(self, displayname=None, add_info=False):
         """Get a list of process types with the specified name."""

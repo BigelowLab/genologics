@@ -194,7 +194,6 @@ class SampleHistory:
             #     pro = In_art.parent_process.id
             # except:
             #     pro = None
-
             history, out_artifact = self._add_out_art_process_conection_list(input_art, out_artifact, history)
             hist_list.append(input_art)
         while out_artifact in self.art_map:
@@ -890,7 +889,7 @@ class StepActions(Entity):
         return actions
 
 
-    def assign_next_actions(self, actionlist):
+    def set_next_actions(self, actionlist):
         '''
         Args: actionlist in the form of a list of dicts with
             format: {'artifact': Artifact, 'step':Step, 'action':action};
@@ -978,13 +977,13 @@ class Step(Entity):
     def reagent_lots(self):
         return self._reagent_lots.reagent_lots
 
-    def advance(self):
-        advance_uri = "/".join([self.uri, "advance"])
-        self.get()
-        data = self.lims.tostring(ElementTree.ElementTree(self.root))
-        self.lims.post(advance_uri, data).attrib['uri']
-        self.lims.cache.clear()
-        return Step(self.lims, self.uri)
+    # def advance(self):
+    #     advance_uri = "/".join([self.uri, "advance"])
+    #    self.get()
+    #     data = self.lims.tostring(ElementTree.ElementTree(self.root))
+    #     self.lims.post(advance_uri, data).attrib['uri']
+    #     self.lims.cache.clear()
+    #     return Step(self.lims, self.uri)
 
 
 class ProtocolStep(Entity):
