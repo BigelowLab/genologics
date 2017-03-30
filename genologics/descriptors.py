@@ -153,12 +153,22 @@ class UdfDictionary(object):
         except:
             return isinstance(value, str)
 
-    def __init__(self, instance, udt=False):
+    def __init__(self, instance, *args, **kwargs):
         self.instance = instance
-        self._udt = udt
+        self._udt = kwargs.pop('udt', False)
+        self.rootkeys = args
+        self._rootnode = None
         self._update_elems()
         self._prepare_lookup()
         self.location = 0
+
+    @property
+    def rootnode(self):
+        if not self._rootnode:
+            self._rootnode = self.instance.root
+            for rootkey in self.rootkeys:
+                self._rootnode = self._rootnode.find(rootkey)
+        return self._rootnode
 
     def get_udt(self):
         if self._udt == True:
@@ -171,7 +181,7 @@ class UdfDictionary(object):
         if not self._udt:
             raise AttributeError('cannot set name for a UDF dictionary')
         self._udt = name
-        elem = self.instance.root.find(nsmap('udf:type'))
+        elem = self.rootnode.find(nsmap('udf:type'))
         assert elem is not None
         elem.set('name', name)
 
@@ -180,13 +190,13 @@ class UdfDictionary(object):
     def _update_elems(self):
         self._elems = []
         if self._udt:
-            elem = self.instance.root.find(nsmap('udf:type'))
+            elem = self.rootnode.find(nsmap('udf:type'))
             if elem is not None:
                 self._udt = elem.attrib['name']
                 self._elems = elem.findall(nsmap('udf:field'))
         else:
             tag = nsmap('udf:field')
-            for elem in self.instance.root.getchildren():
+            for elem in self.rootnode.getchildren():
                 if elem.tag == tag:
                     self._elems.append(elem)
 
@@ -274,9 +284,9 @@ class UdfDictionary(object):
                 raise NotImplementedError("Cannot handle value of type '%s'"
                                           " for UDF" % type(value))
             if self._udt:
-                root = self.instance.root.find(nsmap('udf:type'))
+                root = self.rootnode.find(nsmap('udf:type'))
             else:
-                root = self.instance.root
+                root = self.rootnode
             elem = ElementTree.SubElement(root,
                                           nsmap('udf:field'),
                                           type=vtype,
@@ -295,7 +305,7 @@ class UdfDictionary(object):
         del self._lookup[key]
         for node in self._elems:
             if node.attrib['name'] == key:
-                self.instance.root.remove(node)
+                self.rootnode.remove(node)
                 break
 
     def items(self):
@@ -303,7 +313,7 @@ class UdfDictionary(object):
 
     def clear(self):
         for elem in self._elems:
-            self.instance.root.remove(elem)
+            self.rootnode.remove(elem)
         self._update_elems()
 
     def __iter__(self):
@@ -327,10 +337,21 @@ class UdfDictionaryDescriptor(BaseDescriptor):
     """
     _UDT = False
 
+    def __init__(self, *args):
+        super(BaseDescriptor, self).__init__()
+        self.rootkeys = args
+
     def __get__(self, instance, cls):
         instance.get()
-        self.value = UdfDictionary(instance, udt=self._UDT)
+        self.value = UdfDictionary(instance, *self.rootkeys, udt=self._UDT)
         return self.value
+
+    def __set__(self, instance, dict_value):
+        instance.get()
+        udf_dict = UdfDictionary(instance, *self.rootkeys, udt=self._UDT)
+        udf_dict.clear()
+        for k in dict_value:
+            udf_dict[k] = dict_value[k]
 
 
 class UdtDictionaryDescriptor(UdfDictionaryDescriptor):
@@ -514,10 +535,17 @@ class InputOutputMapList(BaseDescriptor):
     maps of a Process instance.
     """
 
+    def __init__(self, *args):
+        super(BaseDescriptor, self).__init__()
+        self.rootkeys = args
+
     def __get__(self, instance, cls):
         instance.get()
         self.value = []
-        for node in instance.root.findall('input-output-map'):
+        rootnode = instance.root
+        for rootkey in self.rootkeys:
+            rootnode = rootnode.find(rootkey)
+        for node in rootnode.findall('input-output-map'):
             input = self.get_dict(instance.lims, node.find('input'))
             output = self.get_dict(instance.lims, node.find('output'))
             self.value.append((input, output))

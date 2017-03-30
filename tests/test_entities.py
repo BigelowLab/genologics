@@ -1,9 +1,10 @@
+import operator
 from sys import version_info
 from unittest import TestCase
 from xml.etree import ElementTree
 
 from genologics.entities import StepActions, Researcher, Artifact, \
-    Step, StepPlacements, Container, Stage, ReagentKit, ReagentLot
+    Step, StepPlacements, Container, Stage, ReagentKit, ReagentLot, Sample, Project
 from genologics.lims import Lims
 
 if version_info[0] == 2:
@@ -126,6 +127,20 @@ generic_step_actions_no_escalation_xml = """<stp:actions xmlns:stp="http://genol
   </next-actions>
 </stp:actions>"""
 
+generic_sample_creation_xml = """
+<smp:samplecreation xmlns:smp="http://genologics.com/ri/sample" limsid="s1" uri="{url}/api/v2/samples/s1">
+  <location>
+    <container limsid="cont1" uri="{url}/api/v2/containers/cont1">
+    </container>
+    <value>1:1</value>
+  </location>
+  <name>
+    sample1
+  </name>
+  <project uri="{url}/api/v2/projects/p1" limsid="p1">
+  </project>
+</smp:samplecreation>
+"""
 
 class TestEntities(TestCase):
     def test_pass(self):
@@ -133,12 +148,22 @@ class TestEntities(TestCase):
 
 
 def elements_equal(e1, e2):
-    if e1.tag != e2.tag: return False
-    if e1.text and e2.text and e1.text.strip() != e2.text.strip(): return False
-    if e1.tail and e2.tail and e1.tail.strip() != e2.tail.strip(): return False
-    if e1.attrib != e2.attrib: return False
-    if len(e1) != len(e2): return False
-    return all(elements_equal(c1, c2) for c1, c2 in zip(e1, e2))
+    if e1.tag != e2.tag:
+        print('Tag: %s != %s'%(e1.tag, e2.tag))
+        return False
+    if e1.text and e2.text and e1.text.strip() != e2.text.strip():
+        print('Text: %s != %s' % (e1.text.strip(), e2.text.strip()))
+        return False
+    if e1.tail and e2.tail and e1.tail.strip() != e2.tail.strip():
+        print('Tail: %s != %s' % (e1.tail.strip(), e2.tail.strip()))
+        return False
+    if e1.attrib != e2.attrib:
+        print('Attrib: %s != %s' % (e1.attrib, e2.attrib))
+        return False
+    if len(e1) != len(e2):
+        print('length %s (%s) != length (%s) ' % (e1.tag, len(e1), e2.tag, len(e2)))
+        return False
+    return all(elements_equal(c1, c2) for c1, c2 in zip(sorted(e1, key=lambda x: x.tag), sorted(e2, key=lambda x: x.tag)))
 
 
 class TestEntities(TestCase):
@@ -289,3 +314,30 @@ class TestReagentLots(TestEntities):
             assert l.uri
             assert l.name == 'kitname'
             assert l.lot_number == '100'
+
+
+class TestSample(TestEntities):
+    sample_creation = generic_sample_creation_xml.format(url=url)
+
+    def test_create_entity(self):
+        with patch('genologics.lims.requests.post',
+                   return_value=Mock(content=self.sample_creation, status_code=201)) as patch_post:
+            l = Sample.create(
+                self.lims,
+                project=Project(self.lims, uri='project'),
+                container=Container(self.lims, uri='container'),
+                position='1:1',
+                name='s1',
+            )
+            data = '''<?xml version=\'1.0\' encoding=\'utf-8\'?>
+            <smp:samplecreation xmlns:smp="http://genologics.com/ri/sample">
+            <name>s1</name>
+            <project uri="project" />
+            <location>
+              <container uri="container" />
+              <value>1:1</value>
+            </location>
+            </smp:samplecreation>'''
+            assert elements_equal(ElementTree.fromstring(patch_post.call_args_list[0][1]['data']), ElementTree.fromstring(data))
+
+
