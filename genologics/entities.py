@@ -893,8 +893,9 @@ class StepActions(Entity):
             art_uri = node.attrib.get('artifact-uri')
             action = [action for action in actions if action['artifact'].uri == art_uri][0]
             if 'action' in action: node.attrib['action'] = action.get('action')
+            step = [action.get('step', 0) for action in actions if action['artifact'].uri == art_uri][0]
+            if step != 0: node.attrib['step-uri'] = step.uri
         return actions
-
 
     next_actions = property(get_next_actions, set_next_actions)
 
