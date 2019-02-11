@@ -41,7 +41,7 @@ if version_info[:2] < (2,7):
         p26_write(self, file, encoding=encoding)
     ElementTree.ElementTree.write = write_with_xml_declaration
 
-TIMEOUT = 180
+TIMEOUT = 300
 
 
 class Lims(object):
